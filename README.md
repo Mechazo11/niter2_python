@@ -1,2 +1,3 @@
-# lindstorm_nister1_nister2_python
-Python implementation of Peter Lindtstorms "Triangulation Made Easy" iterative two-view triangulation algorithms
+# TODO
+Created as a final project to ME 7953 Advanced Computaitonal Methods. 
+
