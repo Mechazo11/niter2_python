@@ -11,6 +11,7 @@ TODO complete this write up once the project is ready.
     * Numpy
     * Matplotlib
     * Numba
+    * Natsort
     * Ruff [optional for linting]
 
 
