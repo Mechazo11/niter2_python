@@ -40,6 +40,11 @@ On the house dataset compare against the ground truth
 
 4. Worked out example of triangulation using OpenCV: https://temugeb.github.io/opencv/python/2021/02/02/stereo-camera-calibration-and-triangulation.html
 
+5. Finding R and t from Essential matrix: https://inst.eecs.berkeley.edu/~ee290t/fa19/lectures/lecture10-3-decomposing-F-matrix-into-Rotation-and-Translation.pdf
+Using opencv: https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga54a2f5b3f8aeaf6c76d4a31dece85d5d
+
+6. More useful information on point triangulation: https://inst.eecs.berkeley.edu/~ee290t/fa19/lectures/lecture10-3-decomposing-F-matrix-into-Rotation-and-Translation.pdf
+
 ### Obtaining ground truth
 
 * Extract data from [notredame.out](http://www.cs.cornell.edu/~snavely/bundler/bundler-v0.3-manual.html#S6) DEPRICATED, very difficult and Blunder does not install correctly, last updated over 10 years ago
