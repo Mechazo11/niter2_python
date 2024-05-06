@@ -13,8 +13,17 @@ TODO complete this write up once the project is ready.
     * Numba
     * Ruff [optional for linting]
 
-### Helpful tutorials
-* 
+
+### Report write ups
+
+* In methodology secion, in short show how the math for $x^TFx' = 0$ comes out
+
+* Also show $E = K_l^T F K_r$ equation to explain why we unable to use Essential matrix
+
+* From paper, show the key steps for the non-iterative niter2 method
+
+
+
 
 ### Some methodology writing points
 
@@ -30,6 +39,9 @@ TODO complete this write up once the project is ready.
 
 
 ### References
+
+[0] Oxford Univ., "Multiview dataset", URL: https://www.robots.ox.ac.uk/~vgg/data/mview/
+
 [1] Peter Lindstorm, (2010), "Triangulation Made Easy"
 
 [2] Stachniss, (2020), "Triangualtion from Image Pairs", URL: https://www.youtube.com/watch?v=UZlRhEUWSas&t=143s
@@ -47,5 +59,9 @@ TODO complete this write up once the project is ready.
 [8] Stanchiss, "Epipolar Geometry Basics", URL:https://www.youtube.com/watch?v=cLeF-KNHgwU&pp=ygUQZXNzZW50aWFsIG1hdHJpeA%3D%3D
 
 [9] CMU, "Two view geometry", URL: http://16720.courses.cs.cmu.edu/lec/two-view2.pdf
+
+[10] BigSFM: Reconstructing the World from Internet Photos, URL: https://www.cs.cornell.edu/projects/bigsfm/
+
+[11] Li, Snavely, Huttenlocher, "Location Recognition using Prioritized Feature Matching" URL: https://www.cs.cornell.edu/projects/p2f/
 
 [] Unknown, "Project 3: Fundamental Matrix estimation", URL: https://sites.cc.gatech.edu/classes/AY2016/cs4476_fall/results/proj3/html/euzun3/index.html
