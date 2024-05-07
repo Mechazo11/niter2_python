@@ -34,7 +34,7 @@ class DataSetLoader:
     
     Constructor only, all processing done in this method.
     """
-    
+
     def __init__(self, dataset_name:str = "") -> None:
         """Class constructor."""
         # Initialize variables
@@ -104,6 +104,9 @@ class DataSetLoader:
             cv2.waitKey(100)
         cv2.destroyAllWindows()
 
+#! RESUME FROM HERE, write a function that performs what we need
+def test_dev():
+    pass
 
 class Niter2:
     """Non-iterative niter2 triangulation algorthm."""
