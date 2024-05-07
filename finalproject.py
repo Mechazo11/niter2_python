@@ -26,6 +26,7 @@ from typing import Tuple, List
 import yaml
 from pathlib import Path
 import natsort
+import cv2
 
 class DataSetLoader:
     """
@@ -33,7 +34,7 @@ class DataSetLoader:
     
     Constructor only, all processing done in this method.
     """
-
+    
     def __init__(self, dataset_name:str = "") -> None:
         """Class constructor."""
         # Initialize variables
@@ -53,10 +54,8 @@ class DataSetLoader:
         if not Path("./config.yaml").is_file():  # noqa: PTH113, PTH118
             err_msg = "config.yaml not found in root directory!"
             raise FileNotFoundError(err_msg)
-        
         with Path('config.yaml').open() as file:
             config_data = yaml.safe_load(file)
-        
         self.parent_dir = config_data["Directory"]["parent_dir"]
         self.dataset_path = self.parent_dir + dataset_name + "/"
         self.image_path = self.dataset_path + "images/"
@@ -65,41 +64,48 @@ class DataSetLoader:
         if not Path(self.image_path).is_dir():
             err_msg = "Dataset does not have the /image directory!"
             raise FileNotFoundError(err_msg)
-        # Build paths to all images
-        self.build_image_paths()
+        self.build_image_paths() # Build paths to all images
         # Watchdog, check if dataset.yaml exsists
         if not Path(self.dataset_yaml_file).is_file():  # noqa: PTH113, PTH118
             err_msg = "dataset.yaml not found in the dataset directory!"
             raise FileNotFoundError(err_msg)
-        self.extract_camera_params()
-        # Retrieve camera matrix
+        self.extract_camera_params() # Retrieve camera matrix
+        # DEBUG test if pairwise images can be loaded correctly
+        #self.test_pairwise_images()
 
     def build_image_paths(self)->None:
         """Build path to all images in /image directory."""
         im_pth = self.image_path
         self.image_path_lss = natsort.natsorted(list(Path(im_pth).iterdir()),
                                               reverse=False)
+        # From pathlib.PosixPath to str
+        self.image_path_lss = [str(path) for path in self.image_path_lss]
         self.num_images = len(self.image_path_lss)
-        #DEBUG
-        # for iox in self.image_path_lss:
-        #     print(iox)
-        #     break
     
     def extract_camera_params(self):
         """Extract camera configuration parameters."""
         with Path(self.dataset_yaml_file).open() as file:
             dataset_data = yaml.safe_load(file)
-        
         self.calibration_matrix[0,0] = float(dataset_data["Camera"]["fx"])
         self.calibration_matrix[0,2] = float(dataset_data["Camera"]["cx"])
         self.calibration_matrix[1,1] = float(dataset_data["Camera"]["fy"])
         self.calibration_matrix[1,2] = float(dataset_data["Camera"]["cy"])
         self.calibration_matrix[2,2] = 1.0
+        #DEBUG
+        #print(f"calibration matrix: {self.calibration_matrix}")
+    
+    def test_pairwise_images(self):
+        """Test if images are loaded in correct sequence."""
+        for i in range(self.num_images - 1):
+            left_img = cv2.imread(self.image_path_lss[i],cv2.IMREAD_UNCHANGED)
+            right_img = cv2.imread(self.image_path_lss[i+1],cv2.IMREAD_UNCHANGED)
+            cv2.imshow("Left image", left_img)
+            cv2.imshow("Right image", right_img)
+            cv2.waitKey(100)
+        cv2.destroyAllWindows()
 
-        print(f"calibration matrix: {self.calibration_matrix}")
-        
 
 class Niter2:
-    """Implements Non-iterative niter2 triangulation algorthm."""
+    """Non-iterative niter2 triangulation algorthm."""
 
     pass
