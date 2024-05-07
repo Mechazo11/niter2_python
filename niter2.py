@@ -43,7 +43,7 @@ class DataSetLoader:
         self.num_images = 0
         self.image_path_lss = [] # List[str,str.....]
         self.dataset_yaml_file = "" # Path to dataset.yaml
-        self.camera_K = np.zeros((3,3), dtype=float) # K matrix, 3x3
+        self.calibration_matrix = np.zeros((3,3), dtype=float) # K matrix, 3x3
         if not isinstance(dataset_name, str):
             err_msg = "Dataset name must be a string!"
             raise TypeError(err_msg)
@@ -53,8 +53,10 @@ class DataSetLoader:
         if not Path("./config.yaml").is_file():  # noqa: PTH113, PTH118
             err_msg = "config.yaml not found in root directory!"
             raise FileNotFoundError(err_msg)
-        with Path.open('config.yaml') as file:
+        
+        with Path('config.yaml').open() as file:
             config_data = yaml.safe_load(file)
+        
         self.parent_dir = config_data["Directory"]["parent_dir"]
         self.dataset_path = self.parent_dir + dataset_name + "/"
         self.image_path = self.dataset_path + "images/"
@@ -69,7 +71,7 @@ class DataSetLoader:
         if not Path(self.dataset_yaml_file).is_file():  # noqa: PTH113, PTH118
             err_msg = "dataset.yaml not found in the dataset directory!"
             raise FileNotFoundError(err_msg)
-        
+        self.extract_camera_params()
         # Retrieve camera matrix
 
     def build_image_paths(self)->None:
@@ -85,10 +87,16 @@ class DataSetLoader:
     
     def extract_camera_params(self):
         """Extract camera configuration parameters."""
-        with Path.open(self.dataset_yaml_file) as file:
+        with Path(self.dataset_yaml_file).open() as file:
             dataset_data = yaml.safe_load(file)
         
-        #!RESUME FROM HERE
+        self.calibration_matrix[0,0] = float(dataset_data["Camera"]["fx"])
+        self.calibration_matrix[0,2] = float(dataset_data["Camera"]["cx"])
+        self.calibration_matrix[1,1] = float(dataset_data["Camera"]["fy"])
+        self.calibration_matrix[1,2] = float(dataset_data["Camera"]["cy"])
+        self.calibration_matrix[2,2] = 1.0
+
+        print(f"calibration matrix: {self.calibration_matrix}")
         
 
 class Niter2:
