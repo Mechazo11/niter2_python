@@ -25,6 +25,7 @@ import time
 from typing import Tuple, List
 import yaml
 from pathlib import Path
+import natsort
 
 class DataSetLoader:
     """
@@ -35,6 +36,12 @@ class DataSetLoader:
 
     def __init__(self, dataset_name:str = "") -> None:
         """Class constructor."""
+        # Initialize variables
+        self.parent_dir = ""
+        self.dataset_path = ""
+        self.image_path = ""
+        self.num_images = 0
+        self.image_path_lss = [] # List[str,str.....]
         if not isinstance(dataset_name, str):
             err_msg = "Dataset name must be a string!"
             raise TypeError(err_msg)
@@ -55,11 +62,20 @@ class DataSetLoader:
             raise FileNotFoundError(err_msg)
         else:
             print("/image directory found!")
-        
-        
-        print(self.image_path)
+        self.build_image_paths()
+        # Retrieve camera matrix
 
-        # Build paths from yaml file
+    
+    def build_image_paths(self)->None:
+        """Build path to all images in /image directory."""
+        im_pth = self.image_path
+        self.image_path_lss = natsort.natsorted(list(Path(im_pth).iterdir()),
+                                              reverse=False)
+        self.num_images = len(self.image_path_lss)
+        #DEBUG
+        # for iox in self.image_path_lss:
+        #     print(iox)
+        #     break
 
 class Niter2:
     """Implements Non-iterative niter2 triangulation algorthm."""
