@@ -42,6 +42,8 @@ class DataSetLoader:
         self.image_path = ""
         self.num_images = 0
         self.image_path_lss = [] # List[str,str.....]
+        self.dataset_yaml_file = "" # Path to dataset.yaml
+        self.camera_K = np.zeros((3,3), dtype=float) # K matrix, 3x3
         if not isinstance(dataset_name, str):
             err_msg = "Dataset name must be a string!"
             raise TypeError(err_msg)
@@ -56,16 +58,20 @@ class DataSetLoader:
         self.parent_dir = config_data["Directory"]["parent_dir"]
         self.dataset_path = self.parent_dir + dataset_name + "/"
         self.image_path = self.dataset_path + "images/"
+        self.dataset_yaml_file = self.dataset_path + "dataset.yaml"
         # Check if /image subdirectory exsists
         if not Path(self.image_path).is_dir():
             err_msg = "Dataset does not have the /image directory!"
             raise FileNotFoundError(err_msg)
-        else:
-            print("/image directory found!")
+        # Build paths to all images
         self.build_image_paths()
+        # Watchdog, check if dataset.yaml exsists
+        if not Path(self.dataset_yaml_file).is_file():  # noqa: PTH113, PTH118
+            err_msg = "dataset.yaml not found in the dataset directory!"
+            raise FileNotFoundError(err_msg)
+        
         # Retrieve camera matrix
 
-    
     def build_image_paths(self)->None:
         """Build path to all images in /image directory."""
         im_pth = self.image_path
@@ -76,6 +82,14 @@ class DataSetLoader:
         # for iox in self.image_path_lss:
         #     print(iox)
         #     break
+    
+    def extract_camera_params(self):
+        """Extract camera configuration parameters."""
+        with Path.open(self.dataset_yaml_file) as file:
+            dataset_data = yaml.safe_load(file)
+        
+        #!RESUME FROM HERE
+        
 
 class Niter2:
     """Implements Non-iterative niter2 triangulation algorthm."""
