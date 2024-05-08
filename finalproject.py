@@ -28,6 +28,7 @@ from pathlib import Path
 import natsort
 import cv2
 
+
 class DataSetLoader:
     """
     Compile image paths and camera intrinsic parameters for chosen dataset.
@@ -104,11 +105,37 @@ class DataSetLoader:
             cv2.waitKey(100)
         cv2.destroyAllWindows()
 
-#! RESUME FROM HERE, write a function that performs what we need
-def test_dev():
-    pass
-
 class Niter2:
     """Non-iterative niter2 triangulation algorthm."""
 
     pass
+
+def find_keypoint(feature_detector:str):
+    """Compute and track keypoint pairs for a given set of images."""
+    if(feature_detector == "SIFT"):
+        pass
+
+def test_dev(dataset_name: str, feature_detector:str,
+             show_verbose:bool = True)->None:
+    """TODO."""
+    if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
+        err_msg = "choose either 'ORB' or 'SIFT' feature."
+        raise ValueError(err_msg)
+    # Intialize variables
+    left_img_kps = None
+    right_img_kps = None
+    left_img = None
+    right_img = None
+
+    # Define objects
+    dataloader = DataSetLoader(dataset_name)
+    lp = dataloader.image_path_lss[0]
+    rp = dataloader.image_path_lss[1]
+    left_img_kps, right_img_kps = find_keypoint(feature_detector, left_img, right_img)
+    
+    # DEBUG print stats
+    print()
+    print(f"Number of images in dataset: {dataloader.num_images}")
+    print(f"Feature detector selected: {feature_detector}")
+    print()
+    
