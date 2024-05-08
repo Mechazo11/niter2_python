@@ -178,6 +178,8 @@ def detect_features_and_track(feature_detector:str, img1:np.ndarray,
         matches = sorted(matches, key = lambda x:x.distance) # Sort them in the order of their distance.
         pts1 = np.int32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
         pts2 = np.int32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 2)
+        #pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
+        #pts2 = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 2)
     return pts1, pts2
 
 def compute_fundamental_matrix(pts1:List, pts2:List)->Tuple[np.ndarray, List, List]:
@@ -312,14 +314,12 @@ def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray,
     pts1, pts2: 2D matched keypoints [Kx2]
     proj1, proj2: projection matrices of left and right camera respectively, [3x4]
     Call opencv's triangulatePoints()
-    https://stackoverflow.com/questions/58543362/determining-3d-locations-from-two-images-using-opencv-traingulatepoints-units
+    https://docs.opencv.org/4.x/d0/dbd/group__triangulation.html
     """
     hs_pts3d = np.zeros(0, dtype=float)
     hs_pts4d_hom = np.zeros(0, dtype=float)
-    pts1_hom = np.expand_dims(pts1, axis=1)
-    pts2_hom = np.expand_dims(pts2, axis=1)
-    hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1_hom, pts2_hom)
-    #Convert 4d homogeneous coordinates to 3d coordinate
+    hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
+    ##Convert 4d homogeneous coordinates to 3d coordinate
     hs_pts4d_hom = hs_pts4d_hom / np.tile(hs_pts4d_hom[-1, :], (4, 1))
     hs_pts3d = hs_pts4d_hom[:3, :].T
     return hs_pts3d
@@ -354,9 +354,14 @@ def test_pipeline(dataset_name: str, feature_detector:str,
                                                       right_img)
         f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
         e_mat = compute_essential_matrix(f_mat, k_mat)
+        
+        # If not converted to float32, cv2.triangulate points crashes kernel
+        left_pts = left_pts.astype(np.float32)
+        right_pts = right_pts.astype(np.float32)
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
-        #hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+
         print(hs_pts3d[:5])
         break   
         
