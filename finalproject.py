@@ -34,9 +34,51 @@ def curr_time():
     return time.monotonic() * 1000
 
 class Niter2:
-    """Non-iterative niter2 triangulation algorthm."""
+    """
+    Non-iterative niter2 triangulation algorthm.
+    
+    Based on 
+    triangulate.h by 
+    Peter Lindstrom
+    Triangulation Made Easy
+    IEEE Computer Vision and Pattern Recognition 2010, pp. 1554-1561
 
-    pass
+    Python implementation by
+    Azmyin Md. Kamal
+    Ph.d. student, MIE,
+    Louisiana State University
+    
+    The function triangulate_niter2 performs optimal two-view triangulation
+    of a pair of point correspondences in calibrated cameras.  Given measured
+    projections u = (u1, u2, -1) and v = (v1, v2, -1) of a 3D point, u and v
+    are minimally corrected so that they (to near machine precision) satisfy
+    the epipolar constraint u' E v = 0.  The corrected points on the image
+    plane are returned as x = (x1, x2, -1) and y = (y1, y2, -1).
+
+    A right-handed coordinate system is assumed, with the image plane at
+    z = -1.  If a left-handed coordinate system is used, where the image plane
+    is at z = +1, then the argument f should be negated (alternatively, all
+    subtractions of f in the function could be changed to additions).
+
+    Args:
+    TODO
+    
+    """
+
+    def __init__(self, e_mat:np.ndarray) -> None:
+        # Initialize variables
+        self.e_mat = e_mat # [3x3] Essential matrix, numpy
+        # Left right keypoints
+        self.u_vec = np.array([0,0,-1], dtype=float) # [3x1], u = [u1, u2, -1]
+        self.v_vec = np.array([0,0,-1], dtype=float) # [3x1], v = [v1, v2, -1]
+        # Corrected points
+        self.x_vec = np.array([0,0,-1], dtype=float) # [3x1], x = [x1,x2, -1]
+        self.y_vec = np.arange([0,0,-1], dtype=float) # [3x1], y = [y1,y2,-1]
+        self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float)
+        self.e_tildae = np.dot(np.dot(self.s_mat, self.e_mat),self.s_mat.T)
+
+        print(self.e_mat)
+        print(self.e_tildae)
 
 class DataSetLoader:
     """
@@ -396,22 +438,27 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # If not converted to float32, cv2.triangulate points crashes kernel
         left_pts = left_pts.astype(np.float32)
         right_pts = right_pts.astype(np.float32)
-        rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
-        p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
-        t0 = curr_time()
-        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        t_hs = (curr_time() - t0)/1000 # seconds
-        hs_time.append(t_hs) # seconds
-        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        
+        # TODO convert these into a function
+        # rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
+        # p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
+        # t0 = curr_time()
+        # hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        # t_hs = (curr_time() - t0)/1000 # seconds
+        # hs_time.append(t_hs) # seconds
+        # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        if show_verbose:
-            print(f"Processed image pair: {pair_processed}")
-            print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
-            print(f"t_hs: {t_hs} s")
+        # Triangulate with niter2
+        niter2 = Niter2(e_mat)
+
+        # if show_verbose:
+        #     print(f"Processed image pair: {pair_processed}")
+        #     print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
+        #     print(f"t_hs: {t_hs} s")
         pair_processed+=1
         break
-    
+
     # Print statistics
     print()
     hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
