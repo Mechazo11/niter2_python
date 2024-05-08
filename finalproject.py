@@ -28,6 +28,10 @@ from pathlib import Path
 import natsort
 import cv2
 
+# Utility functions
+def curr_time():
+    """Return the time tick in milliseconds."""
+    return time.monotonic() * 1000
 
 class Niter2:
     """Non-iterative niter2 triangulation algorthm."""
@@ -378,7 +382,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
         right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
 
-        show_stereo_images(left_img, right_img)
+        #show_stereo_images(left_img, right_img)
 
         left_pts, right_pts = detect_features_and_track(feature_detector,left_img,
                                                       right_img)
@@ -389,10 +393,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         left_pts = left_pts.astype(np.float32)
         right_pts = right_pts.astype(np.float32)
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
-        p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
+        p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
         hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
         plot_on_3d(hs_pts3d)
-
+        
         if show_verbose:
             # print()
             # print(f"calibration matrix K : {k_mat}")
@@ -405,9 +409,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print()
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
             print()
-        cnt+=1
-        # TODO delete later
-        if(cnt>10):
-            break
+        
+        break
     
-    cv2.destroyAllWindows()
+    # cv2.destroyAllWindows()
