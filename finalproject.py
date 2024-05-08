@@ -161,12 +161,38 @@ def find_matching_keypoints(feature_detector:str, img1:np.ndarray,
         kp2, des2 = sift.detectAndCompute(img2,None)
         # print(type(kp1)) # class tuple
         # print(type(des1))# class numpy.ndarray
+        
+    else:
+        # Setup FLANN for ORB, as suggested
+        # https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html
+        FLANN_INDEX_LSH = 6  # noqa: N806
+        index_params= dict(algorithm = FLANN_INDEX_LSH,  # noqa: C408
+        # table_number = 12, # 6
+        # key_size = 20, # 12
+        # multi_probe_level = 2) #1
+        table_number = 6, # 6
+        key_size = 12, # 12
+        multi_probe_level = 1) #1
+        #search_params = dict(checks=50)  # noqa: C408
+        search_params = {}  # noqa: C408
+        flann = cv2.FlannBasedMatcher(index_params,search_params) # FLANN object
+        # ORB feature detector documentation
+        orb = cv2.ORB_create(nfeatures=500)
+        kp1, des1 = orb.detectAndCompute(img1,None)
+        kp2, des2 = orb.detectAndCompute(img2,None)
+        
+    # Perform Lowe's ratio test and return best matching points
+    if (feature_detector == "SIFT"):
         matches = flann.knnMatch(des1,des2,k=2) # Find an initial matches of keypoints
+        pts1,pts2 = lowe_ratio_test(matches, kp1, kp2)
     else:
         # ORB
-        pass
-    # Perform Lowe's ratio test and return best matching points
-    pts1,pts2 = lowe_ratio_test(matches, kp1, kp2)
+        # Brute force matcher and hamming distance to find matching points
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = bf.match(des1,des2)
+        matches = sorted(matches, key = lambda x:x.distance) # Sort them in the order of their distance.
+        pts1 = np.int32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
+        pts2 = np.int32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 2)
     return pts1, pts2
 
 def compute_fundamental_matrix(pts1:List, pts2:List)->Tuple[np.ndarray, List, List]:
@@ -206,13 +232,11 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     lines1 = cv2.computeCorrespondEpilines(right_pts.reshape(-1,1,2), 2,f_mat)
     lines1 = lines1.reshape(-1,3)
     left_epliline_img,_ = drawlines(left_img,right_img,lines1,left_pts,right_pts)
-    
     # Find epilines correspinding to points in the left image
     # These lines are drawn on the right image
     lines2 = cv2.computeCorrespondEpilines(left_pts.reshape(-1,1,2), 1,f_mat)
     lines2 = lines2.reshape(-1,3)
     right_epiline_img,_ = drawlines(right_img,left_img,lines2,right_pts,left_pts)
-    
     plt.subplot(1,2,1),plt.imshow(left_epliline_img), plt.title('Left Epiline Image')
     plt.subplot(1,2,2),plt.imshow(right_epiline_img), plt.title('Right Epiline Image')
     plt.tight_layout()
@@ -240,9 +264,7 @@ def test_dev(dataset_name: str, feature_detector:str,
     left_pts, right_pts = find_matching_keypoints(feature_detector,left_img, right_img)
     # pts1, pts2 updated in place through return
     f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
-    
-    print(f"left_image: {type(left_img)}, shape: {left_img.shape}")
-
+    # DEBUG
     generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
 
     # DEBUG print stats
@@ -250,5 +272,6 @@ def test_dev(dataset_name: str, feature_detector:str,
         print()
         print(f"Number of images in dataset: {dataloader.num_images}")
         print(f"Feature detector selected: {feature_detector}")
+        print(f"Pts matched: {len(left_pts)}")
         print(f"Fundamental matrix computed: {f_mat}")
         print()
