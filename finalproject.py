@@ -65,18 +65,36 @@ class Niter2:
     
     """
 
-    def __init__(self, e_mat:np.ndarray) -> None:
+    def __init__(self) -> None:
         # Initialize variables
-        self.e_mat = e_mat # [3x3] Essential matrix, numpy
+        self.e_mat = np.zeros((3,3), dtype=float) # [3x3] Essential matrix, numpy
+        self.e_tildae = np.zeros((2,2), dtype=float) # [2x2] upper left submatrix
         # Left right keypoints
-        self.u_vec = np.array([0,0,-1], dtype=float) # [3x1], u = [u1, u2, -1]
-        self.v_vec = np.array([0,0,-1], dtype=float) # [3x1], v = [v1, v2, -1]
+        self.u_vec = np.array([[0,0,-1]], dtype=float) # [3x1], u = [u1, u2, -1]
+        self.v_vec = np.array([[0,0,-1]], dtype=float) # [3x1], v = [v1, v2, -1]
         # Corrected points
-        self.x_vec = np.array([0,0,-1], dtype=float) # [3x1], x = [x1,x2, -1]
-        self.y_vec = np.arange([0,0,-1], dtype=float) # [3x1], y = [y1,y2,-1]
-        self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float)
-        self.e_tildae = np.dot(np.dot(self.s_mat, self.e_mat),self.s_mat.T)
+        self.x_vec = np.array([[0,0,-1]], dtype=float) # [3x1], x = [x1,x2, -1]
+        self.y_vec = np.array([[0,0,-1]], dtype=float) # [3x1], y = [y1,y2,-1]
+        self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
+    def triangulate_niter2(self, left_pts:np.ndarray, right_pts:np.ndarray,
+                           e_mat:np.ndarray)->np.ndarray:
+        """
+
+        Perform triangulation using niter2 algorithm for all 3D points.
+
+        Algorithm is shown in Listing 3 in the paper
+
+        Args:
+        left_pts:[Kx2], keypoint from left camera. Each row corresponds to x in paper
+        right_pts:[Kx2], keypoint from right camera. Each row corresponds to x' in paper
+        e_mat: [3x3]: essential matrix
+
+        Output: x_mat: [Kx3], 3D triangulated points
+        """
+        # Initialize work variables
+        self.e_mat = e_mat
+        self.e_tildae = np.dot(np.dot(self.s_mat, self.e_mat),self.s_mat.T)
         print(self.e_mat)
         print(self.e_tildae)
 
@@ -400,6 +418,8 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     """Test pipeline."""
     # Intialize variables
     pair_processed = 1
+    # Triangulate with niter2
+    niter2 = Niter2()
     dataloader = DataSetLoader(dataset_name)
     k_mat = np.copy(dataloader.calibration_matrix) # camera calibration matrix
     p_mat_left = np.zeros((3,4), dtype=float) # P1
@@ -436,6 +456,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         e_mat = compute_essential_matrix(f_mat, k_mat)
         
         # If not converted to float32, cv2.triangulate points crashes kernel
+        # All points [Nx2] here
         left_pts = left_pts.astype(np.float32)
         right_pts = right_pts.astype(np.float32)
         
@@ -449,8 +470,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        # Triangulate with niter2
-        niter2 = Niter2(e_mat)
+        niter2.triangulate_niter2(left_pts, right_pts, e_mat)
 
         # if show_verbose:
         #     print(f"Processed image pair: {pair_processed}")
@@ -460,12 +480,12 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         break
 
     # Print statistics
-    print()
-    hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
-    hs_total_time = np.sum(np.asarray(hs_time))
-    hs_pts_sec = hs_total_pts / hs_total_time
-    print(f"Total pts triangulated hs {hs_total_pts}")
-    print(f"Total time hs {hs_total_time:.3f}")
-    print(f"points/sec hs: {int(hs_pts_sec)}")
-    print()
+    # print()
+    # hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
+    # hs_total_time = np.sum(np.asarray(hs_time))
+    # hs_pts_sec = hs_total_pts / hs_total_time
+    # print(f"Total pts triangulated hs {hs_total_pts}")
+    # print(f"Total time hs {hs_total_time:.3f}")
+    # print(f"points/sec hs: {int(hs_pts_sec)}")
+    # print()
     # cv2.destroyAllWindows()
