@@ -321,8 +321,26 @@ def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray,
     hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
     ##Convert 4d homogeneous coordinates to 3d coordinate
     hs_pts4d_hom = hs_pts4d_hom / np.tile(hs_pts4d_hom[-1, :], (4, 1))
-    hs_pts3d = hs_pts4d_hom[:3, :].T
+    hs_pts3d = hs_pts4d_hom[:3, :].T # [Nx3], [x,y,z]
     return hs_pts3d
+
+def plot_on_3d(hs_pts3d:np.ndarray)->None:
+    """
+    Plot 3D points using on an isometric plot.
+    
+    TODO add another variable to allow plotting 3d points from both
+    """
+    # Configure plot
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    xs = hs_pts3d[:, 0]
+    ys = hs_pts3d[:, 1]
+    zs = hs_pts3d[:, 2]
+    ax.scatter(xs, ys, zs)
+    ax.set_xlabel('X Label')
+    ax.set_ylabel('Y Label')
+    ax.set_zlabel('Z Label')
+    plt.show()
 
 def test_pipeline(dataset_name: str, feature_detector:str,
                   show_verbose:bool = False)->None:
@@ -361,16 +379,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
         hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-
-        print(hs_pts3d[:5])
-        break   
+        print(f"hs triangulated: {hs_pts3d.shape[0]} points")
+        plot_on_3d(hs_pts3d)
         
-        # try:
-        #     hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        #     print(hs_pts3d[:5])
-        #     break
-        # except:
-        #     print(f"Failed to triangulate points for idx: {i}")
+        break 
 
         if show_verbose:
             print()
