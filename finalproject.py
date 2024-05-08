@@ -337,9 +337,9 @@ def plot_on_3d(hs_pts3d:np.ndarray)->None:
     ys = hs_pts3d[:, 1]
     zs = hs_pts3d[:, 2]
     ax.scatter(xs, ys, zs)
-    ax.set_xlabel('X Label')
-    ax.set_ylabel('Y Label')
-    ax.set_zlabel('Z Label')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y ')
+    ax.set_zlabel('Z')
     plt.show()
 
 def test_pipeline(dataset_name: str, feature_detector:str,
@@ -351,6 +351,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     p_mat_left = np.zeros((3,4), dtype=float) # P1
     p_mat_left[0:3, 0:3] = np.eye(3, dtype=float)
     # Cycle through pairwise images
+    cnt = 0
     for i in range(dataloader.num_images - 1):
         left_img = None
         right_img = None
@@ -368,6 +369,9 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         rp = dataloader.image_path_lss[i+1]
         left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
         right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
+
+        
+
         left_pts, right_pts = detect_features_and_track(feature_detector,left_img,
                                                       right_img)
         f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
@@ -379,22 +383,21 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
         hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        print(f"hs triangulated: {hs_pts3d.shape[0]} points")
         plot_on_3d(hs_pts3d)
-        
-        break 
 
         if show_verbose:
-            print()
-            print(f"calibration matrix K : {k_mat}")
-            print()
-            print(f"Essential matrix E: {e_mat}")
-            print()
-            print("Rotation Matrix 1:\n", rot1)
-            print("Rotation Matrix 2:\n", rot2)
-            print("Translation Vector:\n", tvec)
+            # print()
+            # print(f"calibration matrix K : {k_mat}")
+            # print()
+            # print(f"Essential matrix E: {e_mat}")
+            # print()
+            # print("Rotation Matrix 1:\n", rot1)
+            # print("Rotation Matrix 2:\n", rot2)
+            # print("Translation Vector:\n", tvec)
             print()
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
-        
-        # update p_mat_left = p_mat_right for next pair
-        break # Only one pair
+            print()
+        cnt+=1
+        # TODO delete later
+        if(cnt>15):
+            break
