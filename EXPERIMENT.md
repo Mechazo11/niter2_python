@@ -33,6 +33,10 @@ On the house dataset compare against the ground truth
 
 7. triangulate points using openCV [DLT](https://docs.opencv.org/4.5.5/d9/d0c/group__calib3d.html#gad3fc9a0c82b08df034234979960b778c)
 
+8. Apply Lindstorms's code and compute map points
+
+9. Record stats for point/sec
+
 # Important resources for implementation
 
 1. opencv_epipolar: https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html

@@ -357,12 +357,16 @@ def test_pipeline(dataset_name: str, feature_detector:str,
                   show_verbose:bool = False)->None:
     """Test pipeline."""
     # Intialize variables
+    pair_processed = 1
     dataloader = DataSetLoader(dataset_name)
     k_mat = np.copy(dataloader.calibration_matrix) # camera calibration matrix
     p_mat_left = np.zeros((3,4), dtype=float) # P1
     p_mat_left[0:3, 0:3] = np.eye(3, dtype=float)
+    # Result variables
+    triangualted_pts_hs = [] # List[int]
+    hs_time = [] # List[float]
+    
     # Cycle through pairwise images
-    cnt = 0
     start_idx = 15 # Trial and error, the scale is mostly stable now
     for i in range(start_idx, dataloader.num_images - 1):
         left_img = None
@@ -394,22 +398,27 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         right_pts = right_pts.astype(np.float32)
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
+        t0 = curr_time()
         hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        plot_on_3d(hs_pts3d)
-        
+        t_hs = (curr_time() - t0)/1000 # seconds
+        hs_time.append(t_hs) # seconds
+        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        # plot_on_3d(hs_pts3d)
+
         if show_verbose:
-            # print()
-            # print(f"calibration matrix K : {k_mat}")
-            # print()
-            # print(f"Essential matrix E: {e_mat}")
-            # print()
-            # print("Rotation Matrix 1:\n", rot1)
-            # print("Rotation Matrix 2:\n", rot2)
-            # print("Translation Vector:\n", tvec)
-            print()
+            print(f"Processed image pair: {pair_processed}")
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
-            print()
-        
+            print(f"t_hs: {t_hs} s")
+        pair_processed+=1
         break
     
+    # Print statistics
+    print()
+    hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
+    hs_total_time = np.sum(np.asarray(hs_time))
+    hs_pts_sec = hs_total_pts / hs_total_time
+    print(f"Total pts triangulated hs {hs_total_pts}")
+    print(f"Total time hs {hs_total_time:.3f}")
+    print(f"points/sec hs: {int(hs_pts_sec)}")
+    print()
     # cv2.destroyAllWindows()
