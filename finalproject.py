@@ -302,17 +302,28 @@ def generate_projection_matrix(k_mat:np.ndarray, rot:np.ndarray,
     # print(f"proj_mat: {p_mat}")
     return p_mat
 
-def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray)->np.ndarray:
+def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray, 
+                   proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
     """
-    Triangulate 2D keypoints in world coordinate using opencv.triangualte().
-    
-    Uses Hartley and Zisserman's optimal triangulation method
+    Triangulate 2D keypoints in world coordinate using hs method.
 
+    Uses Hartley and Zisserman's optimal triangulation method
+    _1, _2: left and right camera
+    pts1, pts2: 2D matched keypoints [Kx2]
+    proj1, proj2: projection matrices of left and right camera respectively, [3x4]
+    Call opencv's triangulatePoints()
+    https://stackoverflow.com/questions/58543362/determining-3d-locations-from-two-images-using-opencv-traingulatepoints-units
     """
-    left_pts_hom = np.expand_dims(left_pts, axis=1) 
-    right_pts_hom = np.expand_dims(right_pts, axis=1)
-    hs_pts3d = cv2.triangulatePoints(p_mat_left, p_mat_right,
-                                        left_pts_hom, right_pts_hom) 
+    hs_pts3d = np.zeros(0, dtype=float)
+    hs_pts4d_hom = np.zeros(0, dtype=float)
+    pts1_hom = np.expand_dims(pts1, axis=1)
+    pts2_hom = np.expand_dims(pts2, axis=1)
+    hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2,
+                                     pts1_hom, pts2_hom)
+    # Convert 4d homogeneous coordinates to 3d coordinate
+    hs_pts4d_hom = hs_pts4d_hom / np.tile(hs_pts4d_hom[-1, :], (4, 1))
+    hs_pts3d = hs_pts4d_hom[:3, :].T
+    return hs_pts3d
 
 def test_pipeline(dataset_name: str, feature_detector:str,
                   show_verbose:bool = False)->None:
@@ -346,10 +357,8 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         e_mat = compute_essential_matrix(f_mat, k_mat)
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
-        # Triangulate with Hartley and Zisserman's hs method
-        # points_4d_hom = cv2.triangulatePoints(proj_l, proj_r, 
-        #                  np.expand_dims(pts1, axis=1), np.expand_dims(pts2, axis=1))
-        # Pixels in homogeneous coordinates
+        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        #! RESUME FROM HERE untested
         
 
         if show_verbose:
