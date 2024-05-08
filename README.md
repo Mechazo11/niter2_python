@@ -6,14 +6,19 @@ The key problem this method solves is recovering 3D scene given two or more imag
 
 TODO complete this write up once the project is ready.
 
+TODO the commands to setup enviornment
+
 ### Requirements
-    * OpenCV>= 4.2
+    * ```mamba create --name niter2 python=3.9
+    * ```micromamba activate niter2```
+    * OpenCV= 4.5.5
+        * ```mamba install -c conda-forge opencv=4.5.5=py39hf3d152e_9```
     * Numpy
     * Matplotlib
     * Numba
     * Natsort
     * Ruff [optional for linting]
-
+    * PyYAML
 
 ### Report write ups
 

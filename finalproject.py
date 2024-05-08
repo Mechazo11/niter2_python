@@ -246,7 +246,7 @@ def show_epilines(dataset_name: str, feature_detector:str,
     # Load images and make them grayscale
     left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
     right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
-    left_pts, right_pts = find_matching_keypoints(feature_detector,left_img, right_img)
+    left_pts, right_pts = detect_features_and_track(feature_detector,left_img, right_img)
     # pts1, pts2 updated in place through return
     f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
     # DEBUG
@@ -318,9 +318,8 @@ def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray,
     hs_pts4d_hom = np.zeros(0, dtype=float)
     pts1_hom = np.expand_dims(pts1, axis=1)
     pts2_hom = np.expand_dims(pts2, axis=1)
-    hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2,
-                                     pts1_hom, pts2_hom)
-    # Convert 4d homogeneous coordinates to 3d coordinate
+    hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1_hom, pts2_hom)
+    #Convert 4d homogeneous coordinates to 3d coordinate
     hs_pts4d_hom = hs_pts4d_hom / np.tile(hs_pts4d_hom[-1, :], (4, 1))
     hs_pts3d = hs_pts4d_hom[:3, :].T
     return hs_pts3d
@@ -357,9 +356,16 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         e_mat = compute_essential_matrix(f_mat, k_mat)
         rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
-        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        #! RESUME FROM HERE untested
+        #hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        print(hs_pts3d[:5])
+        break   
         
+        # try:
+        #     hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        #     print(hs_pts3d[:5])
+        #     break
+        # except:
+        #     print(f"Failed to triangulate points for idx: {i}")
 
         if show_verbose:
             print()
@@ -371,6 +377,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print("Rotation Matrix 2:\n", rot2)
             print("Translation Vector:\n", tvec)
             print()
+            print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
         
         # update p_mat_left = p_mat_right for next pair
         break # Only one pair
