@@ -144,7 +144,7 @@ def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     return pts1, pts2
 
 def find_matching_keypoints(feature_detector:str, img1:np.ndarray,
-                            img2:np.ndarray)->None:
+                            img2:np.ndarray)->Tuple[List, List]:
     """Compute and match keypoints in a given set of images."""
     # Initilize work variables
     kp1, des1 = None, None
@@ -169,14 +169,54 @@ def find_matching_keypoints(feature_detector:str, img1:np.ndarray,
     pts1,pts2 = lowe_ratio_test(matches, kp1, kp2)
     return pts1, pts2
 
-def compute_fundamental_matrix(pts1:List, pts2:List)->None:
-    """Call cv2.finFundamentalMat() and return fundamental matrix."""
+def compute_fundamental_matrix(pts1:List, pts2:List)->Tuple[np.ndarray, List, List]:
+    """Call cv2.finFundamentalMat() and return fundamental matrix and inliner points."""
     # Initialize work variables
-    F_mat, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
-    print(type(F_mat))
+    fundamental_mat, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
     # Select inliners only
-    pts1 = pts1[mask.ravel()==1]
-    pts2 = pts2[mask.ravel()==1]
+    in_pts1 = pts1[mask.ravel()==1]
+    in_pts2 = pts2[mask.ravel()==1]
+    return fundamental_mat, in_pts1, in_pts2
+
+def drawlines(img1:np.ndarray,img2:np.ndarray,lines,pts1,pts2)->Tuple[np.ndarray, np.ndarray]:
+    """Draw epilines on img2 w.r.t img1."""
+    # Adopted from https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
+    r,c = img1.shape
+    img1 = cv2.cvtColor(img1,cv2.COLOR_GRAY2BGR)
+    img2 = cv2.cvtColor(img2,cv2.COLOR_GRAY2BGR)
+    for r,pt1,pt2 in zip(lines,pts1,pts2):
+        color = tuple(np.random.randint(0,255,3).tolist())
+        x0,y0 = map(int, [0, -r[2]/r[1] ])
+        x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+        img1 = cv2.line(img1, (x0,y0), (x1,y1), color,1)
+        img1 = cv2.circle(img1,tuple(pt1),5,color,-1)
+        img2 = cv2.circle(img2,tuple(pt2),5,color,-1)
+    return img1,img2
+
+def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
+                   f_mat:np.ndarray, left_pts:List,right_pts:List)->None:
+    """
+    Draw epilines between the two images.
+    
+    Serves as a visual test to check if Fundamental matrix is correct or not
+    f_mat: 3x3 fundamental matrix
+    """
+    # Find epilines correspinding to points in the right image
+    # These lines are drawn on the left image
+    lines1 = cv2.computeCorrespondEpilines(right_pts.reshape(-1,1,2), 2,f_mat)
+    lines1 = lines1.reshape(-1,3)
+    left_epliline_img,_ = drawlines(left_img,right_img,lines1,left_pts,right_pts)
+    
+    # Find epilines correspinding to points in the left image
+    # These lines are drawn on the right image
+    lines2 = cv2.computeCorrespondEpilines(left_pts.reshape(-1,1,2), 1,f_mat)
+    lines2 = lines2.reshape(-1,3)
+    right_epiline_img,_ = drawlines(right_img,left_img,lines2,right_pts,left_pts)
+    
+    plt.subplot(1,2,1),plt.imshow(left_epliline_img), plt.title('Left Epiline Image')
+    plt.subplot(1,2,2),plt.imshow(right_epiline_img), plt.title('Right Epiline Image')
+    plt.tight_layout()
+    plt.show()
 
 def test_dev(dataset_name: str, feature_detector:str,
              show_verbose:bool = True)->None:
@@ -187,23 +227,28 @@ def test_dev(dataset_name: str, feature_detector:str,
     # Intialize variables
     left_img = None
     right_img = None
-    pts1, pts2 = [],[]
-    F_mat, mask = None, None
+    left_pts, right_pts = [],[]
+    f_mat = np.zeros((0),dtype=float)
 
     # Define objects
     dataloader = DataSetLoader(dataset_name)
     lp = dataloader.image_path_lss[0]
     rp = dataloader.image_path_lss[1]
     # Load images and make them grayscale
-    left_img = cv2.imread(lp,cv2.COLOR_BGR2GRAY)
-    right_img = cv2.imread(rp,cv2.COLOR_BGR2GRAY)
-    pts1, pts2 = find_matching_keypoints(feature_detector,left_img, right_img)
-    compute_fundamental_matrix(pts1, pts2)
+    left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
+    right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
+    left_pts, right_pts = find_matching_keypoints(feature_detector,left_img, right_img)
+    # pts1, pts2 updated in place through return
+    f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
+    
+    print(f"left_image: {type(left_img)}, shape: {left_img.shape}")
 
-    
+    generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
+
     # DEBUG print stats
-    print()
-    print(f"Number of images in dataset: {dataloader.num_images}")
-    print(f"Feature detector selected: {feature_detector}")
-    print()
-    
+    if show_verbose:
+        print()
+        print(f"Number of images in dataset: {dataloader.num_images}")
+        print(f"Feature detector selected: {feature_detector}")
+        print(f"Fundamental matrix computed: {f_mat}")
+        print()
