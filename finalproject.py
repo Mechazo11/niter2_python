@@ -29,6 +29,11 @@ import natsort
 import cv2
 
 
+class Niter2:
+    """Non-iterative niter2 triangulation algorthm."""
+
+    pass
+
 class DataSetLoader:
     """
     Compile image paths and camera intrinsic parameters for chosen dataset.
@@ -105,26 +110,6 @@ class DataSetLoader:
             cv2.waitKey(100)
         cv2.destroyAllWindows()
 
-class Niter2:
-    """Non-iterative niter2 triangulation algorthm."""
-
-    pass
-
-# def drawlines(img1,img2,lines,pts1,pts2):
-#     ''' img1 - image on which we draw the epilines for the points in img2
-#     lines - corresponding epilines '''
-#     r,c = img1.shape
-#     img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
-#     img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
-#     for r,pt1,pt2 in zip(lines,pts1,pts2):
-#     color = tuple(np.random.randint(0,255,3).tolist())
-#     x0,y0 = map(int, [0, -r[2]/r[1] ])
-#     x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
-#     img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
-#     img1 = cv.circle(img1,tuple(pt1),5,color,-1)
-#     img2 = cv.circle(img2,tuple(pt2),5,color,-1)
-#     return img1,img2
-
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     """Do Lowe's ratio test to return best matching keypoints."""
     # Initialize variables and constants
@@ -143,7 +128,7 @@ def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     pts2 = np.int32(pts2)
     return pts1, pts2
 
-def find_matching_keypoints(feature_detector:str, img1:np.ndarray,
+def detect_features_and_track(feature_detector:str, img1:np.ndarray,
                             img2:np.ndarray)->Tuple[List, List]:
     """Compute and match keypoints in a given set of images."""
     # Initilize work variables
@@ -242,9 +227,9 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     plt.tight_layout()
     plt.show()
 
-def test_dev(dataset_name: str, feature_detector:str,
-             show_verbose:bool = True)->None:
-    """TODO."""
+def show_epilines(dataset_name: str, feature_detector:str,
+             show_verbose:bool = False)->None:
+    """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
     if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
         err_msg = "choose either 'ORB' or 'SIFT' feature."
         raise ValueError(err_msg)
@@ -275,3 +260,108 @@ def test_dev(dataset_name: str, feature_detector:str,
         print(f"Pts matched: {len(left_pts)}")
         print(f"Fundamental matrix computed: {f_mat}")
         print()
+
+def compute_essential_matrix(f_mat:np.ndarray, k_mat:np.ndarray)->np.ndarray:
+    """Compute essential matrix given K and F."""
+    e_mat = np.zeros((3,3), dtype=float)
+    e_mat = np.dot(np.dot(k_mat.T, f_mat),k_mat)
+    return e_mat
+
+def generate_projection_matrix(k_mat:np.ndarray, rot:np.ndarray,
+                               tvec:np.ndarray)->np.ndarray:
+    """
+    Compute 3x4 Projectio Matrix P.
+    
+    k_mat: 3x3 calibration matrix K
+    rot: 3x3 rotation matrix R
+    tvec: 3x1 translation vector t
+    p_mat: 3x4 projection matrix P
+    m_intrin_mat and m_extrin_mat defined based on
+    https://www.youtube.com/watch?v=S-UHiFsn-GI&list=PL2zRqk16wsdoCCLpou-dGo7QQNks1Ppzo&index=1
+    m_intrin: 3x4 intrinsic matrix M_int
+    m_extrin: 4x4 extrinsic matrix M_ext
+    """
+    # Initialize work variables
+    m_intrin = np.zeros((3,4), dtype=float)
+    m_extrin = np.zeros((4,4), dtype=float)
+    p_mat = np.zeros((3,4), dtype=float)
+    # Populate Mint, and Mext matrices
+    m_intrin[:3,:3] = np.copy(k_mat)
+    m_extrin[-1,-1] = 1
+    m_extrin[0:3, -1] = tvec.T
+    m_extrin[0:3, 0:3] = rot
+    p_mat = np.dot(m_intrin, m_extrin)
+    # DEBUG
+    # print(f"m_intrin: \n{m_intrin}")
+    # print()
+    # print(f"rot: \n{rot}")
+    # print(f"tvec: {tvec}")
+    # print()
+    # print(f"m_extrin: \n{m_extrin}")
+    # print()
+    # print(f"proj_mat: {p_mat}")
+    return p_mat
+
+def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray)->np.ndarray:
+    """
+    Triangulate 2D keypoints in world coordinate using opencv.triangualte().
+    
+    Uses Hartley and Zisserman's optimal triangulation method
+
+    """
+    left_pts_hom = np.expand_dims(left_pts, axis=1) 
+    right_pts_hom = np.expand_dims(right_pts, axis=1)
+    hs_pts3d = cv2.triangulatePoints(p_mat_left, p_mat_right,
+                                        left_pts_hom, right_pts_hom) 
+
+def test_pipeline(dataset_name: str, feature_detector:str,
+                  show_verbose:bool = False)->None:
+    """Test pipeline."""
+    # Intialize variables
+    dataloader = DataSetLoader(dataset_name)
+    k_mat = np.copy(dataloader.calibration_matrix) # camera calibration matrix
+    p_mat_left = np.zeros((3,4), dtype=float) # P1
+    p_mat_left[0:3, 0:3] = np.eye(3, dtype=float)
+    # Cycle through pairwise images
+    for i in range(dataloader.num_images - 1):
+        left_img = None
+        right_img = None
+        left_pts, right_pts = [],[]
+        f_mat = np.zeros((0),dtype=float)
+        e_mat = np.zeros((0), dtype=float)
+        p_mat_right = np.zeros((3,4), dtype=float)
+        rot1 = np.zeros((3,3), dtype=float)
+        rot2 = np.zeros((3,3), dtype=float)
+        tvec = np.zeros(3, dtype=float)
+        hs_pts3d = np.zeros(0, dtype=float) # [Kx4] 3d poits in homogeneous coord
+
+        # paths to left and right image
+        lp = dataloader.image_path_lss[i]
+        rp = dataloader.image_path_lss[i+1]
+        left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
+        right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
+        left_pts, right_pts = detect_features_and_track(feature_detector,left_img,
+                                                      right_img)
+        f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
+        e_mat = compute_essential_matrix(f_mat, k_mat)
+        rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
+        p_mat_right = generate_projection_matrix(k_mat, e_mat, tvec) # P2
+        # Triangulate with Hartley and Zisserman's hs method
+        # points_4d_hom = cv2.triangulatePoints(proj_l, proj_r, 
+        #                  np.expand_dims(pts1, axis=1), np.expand_dims(pts2, axis=1))
+        # Pixels in homogeneous coordinates
+        
+
+        if show_verbose:
+            print()
+            print(f"calibration matrix K : {k_mat}")
+            print()
+            print(f"Essential matrix E: {e_mat}")
+            print()
+            print("Rotation Matrix 1:\n", rot1)
+            print("Rotation Matrix 2:\n", rot2)
+            print("Translation Vector:\n", tvec)
+            print()
+        
+        # update p_mat_left = p_mat_right for next pair
+        break # Only one pair

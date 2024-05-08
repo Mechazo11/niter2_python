@@ -17,6 +17,8 @@ TODO complete this write up once the project is ready.
 
 ### Report write ups
 
+* State that ```Triangulation``` is also called the ```Structure-from-Motion (SfM)``` problem
+
 * In methodology secion, in short show how the math for $x^TFx' = 0$ comes out
 
 * Also show $E = K_l^T F K_r$ equation to explain why we unable to use Essential matrix
