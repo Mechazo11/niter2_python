@@ -48,8 +48,11 @@ class Niter2:
     Ph.d. student, MIE,
     Louisiana State University
     
-    The function triangulate_niter2 performs optimal two-view triangulation
-    of a pair of point correspondences in calibrated cameras.  Given measured
+    The function triangulate performs optimal two-view triangulation
+    of a pair of point correspondences in calibrated cameras. Either niter1
+    or niter2 can be used, with system defaulting to niter2 
+    
+    Given measured
     projections u = (u1, u2, -1) and v = (v1, v2, -1) of a 3D point, u and v
     are minimally corrected so that they (to near machine precision) satisfy
     the epipolar constraint u' E v = 0.  The corrected points on the image
@@ -65,7 +68,7 @@ class Niter2:
     
     """
 
-    def __init__(self) -> None:
+    def __init__(self, algorithm:str = "niter2") -> None:
         # Initialize variables
         # self.e_mat = np.zeros((3,3), dtype=float) # [3x3] Essential matrix, numpy
         # self.e_tildae = np.zeros((2,2), dtype=float) # [2x2] upper left submatrix
@@ -75,9 +78,13 @@ class Niter2:
         # # Corrected points
         # self.x_vec = np.array([[0,0,-1]], dtype=float) # [3x1], x = [x1,x2, -1]
         # self.y_vec = np.array([[0,0,-1]], dtype=float) # [3x1], y = [y1,y2,-1]
+        if algorithm == "niter1":
+            self.algorithm = np.array([[1]], dtype=np.int8) # 1 --> niter1
+        else:
+            self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
         self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
-    def triangulate_niter2(self, left_pts:np.ndarray, right_pts:np.ndarray,
+    def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray)->np.ndarray:
         """
 
@@ -112,19 +119,42 @@ class Niter2:
             err_msg = "keypoints must be passed as a Nx2 numpy array"
             raise ValueError(err_msg)
 
-        # Initialize work variables
+        # Initialize constant variables
         #self.e_mat = e_mat
         e_tildae = np.zeros((2,2), dtype=float)
         e_tildae = np.dot(np.dot(self.s_mat, e_mat),self.s_mat.T)
-        x_3d = np.zeros(3, dtype=float) # in paper x \in R^3, homogeneous coord
-        x_prime_3d = np.zeros(3, dtype=float) # in paper x' \in R^3, homogeneous coord
+        s_mat = self.s_mat # [2x3] S matrix
+        # Initialize work variables
+        x = np.zeros(3, dtype=float) # in paper x \in R^3, homogeneous coord
+        x_prime = np.zeros(3, dtype=float) # in paper x' \in R^3, homogeneous coord
+        n = np.zeros(2, dtype=float) # [1x2] step direction for x
+        n_prime = np.zeros(2, dtype=float) # [1x2] step direction for x'
+        a = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
+        b = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
+        c = np.zeros(1, dtype=float) # [1x1], x.T * E * x', scalar
+        d = np.zeros(1, dtype=float) # [1x1], scalar
+        lambda_ = np.zeros(1, dtype=float) # [1x1], scalar, step size
+        del_x = np.zeros(3, dtype=float) # in paper delta_x \in R^3, hom coord
+        del_x_prime = np.zeros(3, dtype=float) # in paper delta_x' \in R^3, hom coord
         # Primary loop
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
-            x_3d = np.append(left_pts[i], 1)  # [1x3]
-            x_prime_3d = np.append(right_pts[i], 1)  # [1x3]
-            print(x_3d)
-            print(x_prime_3d)
+            x = np.append(left_pts[i], 1)  # [1x3]
+            x_prime = np.append(right_pts[i], 1)  # [1x3]
+            n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
+            n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
+            a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
+            b = 0.5 * (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
+            c = np.dot(np.dot(x.T, e_mat),x_prime) # c = (x.T).E.x'
+            d = np.sqrt(b**2 - a * c) # d = sqrt(b**2 - a*c)
+            lambda_ = c / (b + d) # \lambda = c / (b+d)
+            del_x = lambda_ * n # [1x3]
+            del_x_prime = lambda_ * n_prime #[1x3]
+            n = n - np.dot(e_tildae,del_x_prime) # n = n - E_tildae.delta_x'
+            n_prime = n_prime - np.dot(e_tildae.T, del_x)
+            
+
+
             break
         # DEBUG
         # print(self.e_mat)
