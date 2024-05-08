@@ -110,10 +110,73 @@ class Niter2:
 
     pass
 
-def find_keypoint(feature_detector:str):
-    """Compute and track keypoint pairs for a given set of images."""
+# def drawlines(img1,img2,lines,pts1,pts2):
+#     ''' img1 - image on which we draw the epilines for the points in img2
+#     lines - corresponding epilines '''
+#     r,c = img1.shape
+#     img1 = cv.cvtColor(img1,cv.COLOR_GRAY2BGR)
+#     img2 = cv.cvtColor(img2,cv.COLOR_GRAY2BGR)
+#     for r,pt1,pt2 in zip(lines,pts1,pts2):
+#     color = tuple(np.random.randint(0,255,3).tolist())
+#     x0,y0 = map(int, [0, -r[2]/r[1] ])
+#     x1,y1 = map(int, [c, -(r[2]+r[0]*c)/r[1] ])
+#     img1 = cv.line(img1, (x0,y0), (x1,y1), color,1)
+#     img1 = cv.circle(img1,tuple(pt1),5,color,-1)
+#     img2 = cv.circle(img2,tuple(pt2),5,color,-1)
+#     return img1,img2
+
+def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
+    """Do Lowe's ratio test to return best matching keypoints."""
+    # Initialize variables and constants
+    pts1 = []
+    pts2 = []
+    dist_thres = 0.8
+    for _,(m,n) in enumerate(matches):
+        if m.distance < dist_thres*n.distance:
+            pts2.append(kp2[m.trainIdx].pt)
+            pts1.append(kp1[m.queryIdx].pt)
+    # DEBUG
+    # print(f"Num keypoints in pts1: {len(pts1)}")
+    # print(f"Num keypoints in pts2: {len(pts2)}")
+    # Convert to 32-bit integers
+    pts1 = np.int32(pts1)
+    pts2 = np.int32(pts2)
+    return pts1, pts2
+
+def find_matching_keypoints(feature_detector:str, img1:np.ndarray,
+                            img2:np.ndarray)->None:
+    """Compute and match keypoints in a given set of images."""
+    # Initilize work variables
+    kp1, des1 = None, None
+    kp2, des2 = None, None
+    pts1, pts2 = [],[]
     if(feature_detector == "SIFT"):
+        # Setup FLANN, as suggested in https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html
+        FLANN_INDEX_KDTREE = 1  # noqa: N806
+        index_params = dict(algorithm = FLANN_INDEX_KDTREE, trees = 5)  # noqa: C408
+        search_params = dict(checks=50)  # noqa: C408
+        flann = cv2.FlannBasedMatcher(index_params,search_params) # FLANN object
+        sift = cv2.SIFT_create()
+        kp1, des1 = sift.detectAndCompute(img1,None)
+        kp2, des2 = sift.detectAndCompute(img2,None)
+        # print(type(kp1)) # class tuple
+        # print(type(des1))# class numpy.ndarray
+        matches = flann.knnMatch(des1,des2,k=2) # Find an initial matches of keypoints
+    else:
+        # ORB
         pass
+    # Perform Lowe's ratio test and return best matching points
+    pts1,pts2 = lowe_ratio_test(matches, kp1, kp2)
+    return pts1, pts2
+
+def compute_fundamental_matrix(pts1:List, pts2:List)->None:
+    """Call cv2.finFundamentalMat() and return fundamental matrix."""
+    # Initialize work variables
+    F_mat, mask = cv2.findFundamentalMat(pts1,pts2,cv2.FM_LMEDS)
+    print(type(F_mat))
+    # Select inliners only
+    pts1 = pts1[mask.ravel()==1]
+    pts2 = pts2[mask.ravel()==1]
 
 def test_dev(dataset_name: str, feature_detector:str,
              show_verbose:bool = True)->None:
@@ -122,16 +185,21 @@ def test_dev(dataset_name: str, feature_detector:str,
         err_msg = "choose either 'ORB' or 'SIFT' feature."
         raise ValueError(err_msg)
     # Intialize variables
-    left_img_kps = None
-    right_img_kps = None
     left_img = None
     right_img = None
+    pts1, pts2 = [],[]
+    F_mat, mask = None, None
 
     # Define objects
     dataloader = DataSetLoader(dataset_name)
     lp = dataloader.image_path_lss[0]
     rp = dataloader.image_path_lss[1]
-    left_img_kps, right_img_kps = find_keypoint(feature_detector, left_img, right_img)
+    # Load images and make them grayscale
+    left_img = cv2.imread(lp,cv2.COLOR_BGR2GRAY)
+    right_img = cv2.imread(rp,cv2.COLOR_BGR2GRAY)
+    pts1, pts2 = find_matching_keypoints(feature_detector,left_img, right_img)
+    compute_fundamental_matrix(pts1, pts2)
+
     
     # DEBUG print stats
     print()

@@ -36,9 +36,13 @@ On the house dataset compare against the ground truth
 
 2. [OpenCV and Sift](https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html) or 
 
+[1] OpenCV, "Feature Matching with FLANN", URL:https://docs.opencv.org/4.x/d5/d6f/tutorial_feature_flann_matcher.html
+
+[1] OpenCV, "Feature Matching", URL: https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html 
+
 3. [OpenCV with ORB](https://towardsdatascience.com/improving-your-image-matching-results-by-14-with-one-line-of-code-b72ae9ca2b73)
 
-4. Worked out example of triangulation using OpenCV: https://temugeb.github.io/opencv/python/2021/02/02/stereo-camera-calibration-and-triangulation.html
+4. CMU, "Triangulation", URL: http://www.cs.cmu.edu/~16385/s17/Slides/11.4_Triangulation.pdf
 
 5. Finding R and t from Essential matrix: https://inst.eecs.berkeley.edu/~ee290t/fa19/lectures/lecture10-3-decomposing-F-matrix-into-Rotation-and-Translation.pdf
 Using opencv: https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga54a2f5b3f8aeaf6c76d4a31dece85d5d

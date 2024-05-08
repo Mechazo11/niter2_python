@@ -43,6 +43,10 @@ TODO complete this write up once the project is ready.
 
 [0] Oxford Univ., "Multiview dataset", URL: https://www.robots.ox.ac.uk/~vgg/data/mview/
 
+[0] D Lowe, (2004) "Scale-Invariant Feature Transform", URL: https://docs.opencv.org/4.x/da/df5/tutorial_py_sift_intro.html
+
+[1a] Lowe,(2004), "Distinctive Image Features from Scale-Invariant Keypoints"
+
 [1] Peter Lindstorm, (2010), "Triangulation Made Easy"
 
 [2] Stachniss, (2020), "Triangualtion from Image Pairs", URL: https://www.youtube.com/watch?v=UZlRhEUWSas&t=143s
