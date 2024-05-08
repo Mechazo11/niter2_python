@@ -67,14 +67,14 @@ class Niter2:
 
     def __init__(self) -> None:
         # Initialize variables
-        self.e_mat = np.zeros((3,3), dtype=float) # [3x3] Essential matrix, numpy
-        self.e_tildae = np.zeros((2,2), dtype=float) # [2x2] upper left submatrix
-        # Left right keypoints
-        self.u_vec = np.array([[0,0,-1]], dtype=float) # [3x1], u = [u1, u2, -1]
-        self.v_vec = np.array([[0,0,-1]], dtype=float) # [3x1], v = [v1, v2, -1]
-        # Corrected points
-        self.x_vec = np.array([[0,0,-1]], dtype=float) # [3x1], x = [x1,x2, -1]
-        self.y_vec = np.array([[0,0,-1]], dtype=float) # [3x1], y = [y1,y2,-1]
+        # self.e_mat = np.zeros((3,3), dtype=float) # [3x3] Essential matrix, numpy
+        # self.e_tildae = np.zeros((2,2), dtype=float) # [2x2] upper left submatrix
+        # # Left right keypoints
+        # self.u_vec = np.array([[0,0,-1]], dtype=float) # [3x1], u = [u1, u2, -1]
+        # self.v_vec = np.array([[0,0,-1]], dtype=float) # [3x1], v = [v1, v2, -1]
+        # # Corrected points
+        # self.x_vec = np.array([[0,0,-1]], dtype=float) # [3x1], x = [x1,x2, -1]
+        # self.y_vec = np.array([[0,0,-1]], dtype=float) # [3x1], y = [y1,y2,-1]
         self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
     def triangulate_niter2(self, left_pts:np.ndarray, right_pts:np.ndarray,
@@ -90,13 +90,45 @@ class Niter2:
         right_pts:[Kx2], keypoint from right camera. Each row corresponds to x' in paper
         e_mat: [3x3]: essential matrix
 
+        Variables:
+        n_l = step direction for left keypoints [1x1+]
+
         Output: x_mat: [Kx3], 3D triangulated points
         """
+        # Type checks, value checks
+        if not isinstance(left_pts, np.ndarray):
+            err_msg = "left_pts must be a Numpy array."
+            raise TypeError(err_msg)
+        if not isinstance(right_pts, np.ndarray):
+            err_msg = "right_pts must be a Numpy array."
+            raise TypeError(err_msg)
+        if not isinstance(e_mat, np.ndarray):
+            err_msg = "Essential matrix must be a Numpy array."
+            raise TypeError(err_msg)
+        if (left_pts.shape[0]!=right_pts.shape[0]):
+            err_msg = "keypoints matched between left and right images must be same!"
+            raise ValueError(err_msg)
+        if left_pts.shape[1]!=2 or right_pts.shape[1]!=2:
+            err_msg = "keypoints must be passed as a Nx2 numpy array"
+            raise ValueError(err_msg)
+
         # Initialize work variables
-        self.e_mat = e_mat
-        self.e_tildae = np.dot(np.dot(self.s_mat, self.e_mat),self.s_mat.T)
-        print(self.e_mat)
-        print(self.e_tildae)
+        #self.e_mat = e_mat
+        e_tildae = np.zeros((2,2), dtype=float)
+        e_tildae = np.dot(np.dot(self.s_mat, e_mat),self.s_mat.T)
+        x_3d = np.zeros(3, dtype=float) # in paper x \in R^3, homogeneous coord
+        x_prime_3d = np.zeros(3, dtype=float) # in paper x' \in R^3, homogeneous coord
+        # Primary loop
+        for i in range(left_pts.shape[0]):
+            # Initialize variables for these keypoints pairs
+            x_3d = np.append(left_pts[i], 1)  # [1x3]
+            x_prime_3d = np.append(right_pts[i], 1)  # [1x3]
+            print(x_3d)
+            print(x_prime_3d)
+            break
+        # DEBUG
+        # print(self.e_mat)
+        # print(self.e_tildae)
 
 class DataSetLoader:
     """
