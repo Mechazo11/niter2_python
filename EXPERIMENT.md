@@ -23,9 +23,11 @@ On the house dataset compare against the ground truth
     * SIFT
     * ORB
 
-3. Find pairwise matching points $<x, x'>$ using optical flow algorithm, OpenCV uses KTL
+3. Find pairwise matching points $<x, x'>$ using optical flow algorithm, OpenCV
 
-4. As the camera matrix K is not known for Notre Dame dataset, we need to estimate Fundamental matrix F.
+4. Estimate Fundamental matrix
+
+5. Compute Essential matrix
 
 [Project 3 / Camera Calibration and Fundamental Matrix Estimation with RANSAC](https://sites.cc.gatech.edu/classes/AY2016/cs4476_fall/results/proj3/html/euzun3/index.html) is a good reference that uses Notre Dame dataset
 
