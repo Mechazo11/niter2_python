@@ -342,6 +342,13 @@ def plot_on_3d(hs_pts3d:np.ndarray)->None:
     ax.set_zlabel('Z')
     plt.show()
 
+def show_stereo_images(left_img:np.ndarray, right_img:np.ndarray):
+    """Call imshow() to show left right image pairs."""
+    # Only needed for debugging purpose
+    cv2.imshow("left_img", left_img)
+    cv2.imshow("right_img", right_img)
+    cv2.waitKey(1)
+
 def test_pipeline(dataset_name: str, feature_detector:str,
                   show_verbose:bool = False)->None:
     """Test pipeline."""
@@ -352,7 +359,8 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     p_mat_left[0:3, 0:3] = np.eye(3, dtype=float)
     # Cycle through pairwise images
     cnt = 0
-    for i in range(dataloader.num_images - 1):
+    start_idx = 15 # Trial and error, the scale is mostly stable now
+    for i in range(start_idx, dataloader.num_images - 1):
         left_img = None
         right_img = None
         left_pts, right_pts = [],[]
@@ -370,7 +378,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
         right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
 
-        
+        show_stereo_images(left_img, right_img)
 
         left_pts, right_pts = detect_features_and_track(feature_detector,left_img,
                                                       right_img)
@@ -399,5 +407,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print()
         cnt+=1
         # TODO delete later
-        if(cnt>15):
+        if(cnt>10):
             break
+    
+    cv2.destroyAllWindows()
