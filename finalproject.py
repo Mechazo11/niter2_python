@@ -82,7 +82,7 @@ class Niter2:
             self.algorithm = np.array([[1]], dtype=np.int8) # 1 --> niter1
         else:
             self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
-        self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
+        # self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
     def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->np.ndarray:
@@ -521,6 +521,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         left_pts, right_pts = [],[]
         f_mat = np.zeros((0),dtype=float)
         e_mat = np.zeros((0), dtype=float)
+        s_mat = np.array([[1,0,0], [0,1,0]], dtype=float)
         p_mat_right = np.zeros((3,4), dtype=float)
         rot1 = np.zeros((3,3), dtype=float)
         rot2 = np.zeros((3,3), dtype=float)
@@ -555,7 +556,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        niter2.triangulate_niter2(left_pts, right_pts, e_mat)
+        niter2.triangulate(left_pts, right_pts, e_mat, s_mat)
 
         # if show_verbose:
         #     print(f"Processed image pair: {pair_processed}")
