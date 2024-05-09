@@ -85,7 +85,8 @@ class Niter2:
         # self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
     def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
-                           e_mat:np.ndarray, s_mat:np.ndarray)->np.ndarray:
+                           e_mat:np.ndarray, s_mat:np.ndarray,
+                           rot:np.ndarray)->np.ndarray:
         """
 
         Perform triangulation using niter2 algorithm for all 3D points.
@@ -97,6 +98,7 @@ class Niter2:
         right_pts:[Kx2], keypoint from right camera. Each row corresponds to x' in paper
         e_mat: [3x3]: essential matrix
         s_mat: [2x3]: matrix defined in Equation 4
+        rot: [3x3]: Rotation matrix (obtained by decomposing essential matrix)
 
         Variables:
         n_l = step direction for left keypoints [1x1+]
@@ -138,6 +140,7 @@ class Niter2:
         lambda_ = np.zeros(1, dtype=float) # [1x1], scalar, step size
         del_x = np.zeros(3, dtype=float) # in paper delta_x \in R^3, hom coord
         del_x_prime = np.zeros(3, dtype=float) # in paper delta_x' \in R^3, hom coord
+        x_3d = np.zeros(3, dtype=float)
         # Primary loop
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
@@ -170,18 +173,32 @@ class Niter2:
             # Corrected points <x_hat, x_hat_prime> in homogeneous coord
             x = x - np.dot(s_mat.T, del_x) # x_hat
             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
-
+            x_3d = self.compute_3d(e_mat, x, x_prime, rot) # [1x3]
+            out_pts = np.vstack(out_pts, x_3d)
             # DEBUG
-            print(f"x: {left_pts[i]}")
-            print(f"x': {right_pts[i]}")
-            print()
-            print(f"x_hat: {x}")
-            print(f"x_hat': {x_prime}")
+            # print(f"x: {left_pts[i]}")
+            # print(f"x': {right_pts[i]}")
+            # print()
+            # print(f"x_hat: {x}")
+            # print(f"x_hat': {x_prime}")
+            # print()
+            # print(f"x_3d: {x_3d}")
 
             break
-        
+
         # print(self.e_mat)
         # print(self.e_tildae)
+    def compute_3d(self, e_mat:np.ndarray, x_hat:np.ndarray, x_hat_prime:np.ndarray,
+                   rot:np.ndarray)->np.ndarray:
+        """Compute 3D vector given pose and camera intrinsic."""
+        # Initialize work variable
+        z = np.zeros(3, dtype=float)
+        x_3d = np.zeros(3, dtype=float)
+        z = np.cross(x_hat,np.dot(rot, x_hat_prime)) #[1x3]
+        x_num = np.dot(np.dot(z.T, e_mat),x_hat_prime)
+        x_deno = np.dot(z.T,z)
+        x_3d = (x_num / x_deno) * x_hat
+        return x_3d
 
 class DataSetLoader:
     """
@@ -527,6 +544,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         rot2 = np.zeros((3,3), dtype=float)
         tvec = np.zeros(3, dtype=float)
         hs_pts3d = np.zeros(0, dtype=float) # [Kx4] 3d poits in homogeneous coord
+        niter_pts3d = np.zeros(0, dtype=float) # [Kx4] 3d points in homogeneous coord
 
         # paths to left and right image
         lp = dataloader.image_path_lss[i]
@@ -540,6 +558,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
                                                       right_img)
         f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
         e_mat = compute_essential_matrix(f_mat, k_mat)
+        rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
         
         # If not converted to float32, cv2.triangulate points crashes kernel
         # All points [Nx2] here
@@ -547,7 +566,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         right_pts = right_pts.astype(np.float32)
         
         # TODO convert these into a function
-        # rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
+        
         # p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
         # t0 = curr_time()
         # hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
@@ -556,7 +575,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        niter2.triangulate(left_pts, right_pts, e_mat, s_mat)
+        niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
 
         # if show_verbose:
         #     print(f"Processed image pair: {pair_processed}")
