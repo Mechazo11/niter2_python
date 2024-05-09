@@ -84,12 +84,11 @@ class Niter2:
             self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
         # self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
-    def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
+    def non_iter_update(self,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray,
-                           rot:np.ndarray)->np.ndarray:
+                           rot:np.ndarray)->Tuple[np.ndarray, np.ndarray]:
         """
-
-        Perform triangulation using niter2 algorithm for all 3D points.
+        Perform non-iterative update as shown in Section 5.
 
         Algorithm is shown in Listing 3 in the paper
 
@@ -100,31 +99,11 @@ class Niter2:
         s_mat: [2x3]: matrix defined in Equation 4
         rot: [3x3]: Rotation matrix (obtained by decomposing essential matrix)
 
-        Variables:
-        n_l = step direction for left keypoints [1x1+]
-
-        Output: x_mat: [Kx3], 3D triangulated points
+        Output:
+        x_hat: [Kx3] updated left points in homogeneous coord
+        x_hat_prime: [Kx3] updated right points in homogeneous coord
         """
-        # Type checks, value checks
-        if not isinstance(left_pts, np.ndarray):
-            err_msg = "left_pts must be a Numpy array."
-            raise TypeError(err_msg)
-        if not isinstance(right_pts, np.ndarray):
-            err_msg = "right_pts must be a Numpy array."
-            raise TypeError(err_msg)
-        if not isinstance(e_mat, np.ndarray):
-            err_msg = "Essential matrix must be a Numpy array."
-            raise TypeError(err_msg)
-        if (left_pts.shape[0]!=right_pts.shape[0]):
-            err_msg = "keypoints matched between left and right images must be same!"
-            raise ValueError(err_msg)
-        if left_pts.shape[1]!=2 or right_pts.shape[1]!=2:
-            err_msg = "keypoints must be passed as a Nx2 numpy array"
-            raise ValueError(err_msg)
-
         # Initialize constant variables
-        #self.e_mat = e_mat
-        out_pts = np.zeros((0,3), dtype=float) # [Kx3], triangulated points
         e_tildae = np.zeros((2,2), dtype=float)
         e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T)
         # Initialize work variables
@@ -140,7 +119,9 @@ class Niter2:
         lambda_ = np.zeros(1, dtype=float) # [1x1], scalar, step size
         del_x = np.zeros(3, dtype=float) # in paper delta_x \in R^3, hom coord
         del_x_prime = np.zeros(3, dtype=float) # in paper delta_x' \in R^3, hom coord
-        x_3d = np.zeros(3, dtype=float)
+        x_hat = np.zeros((0,3), dtype=float) # [Kx3]
+        x_hat_prime = np.zeros((0,3), dtype=float) # [Kx3]
+
         # Primary loop
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
@@ -169,8 +150,9 @@ class Niter2:
             # Corrected points <x_hat, x_hat_prime> in homogeneous coord
             x = x - np.dot(s_mat.T, del_x) # x_hat
             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
-            x_3d = self.compute_3d(e_mat, x, x_prime, rot) # [1x3]
-            out_pts=np.vstack((out_pts, x_3d)) # Push to array
+            # Push to matrix
+            x_hat = np.vstack((x_hat, x))
+            x_hat_prime = np.vstack((x_hat, x_prime))
             # DEBUG
             # print(f"x: {left_pts[i]}")
             # print(f"x': {right_pts[i]}")
@@ -179,17 +161,56 @@ class Niter2:
             # print(f"x_hat': {x_prime}")
             # print()
             # print(f"x_3d: {x_3d}")
-            break
+        x_hat = np.floor(x_hat).astype(int)
+        x_hat_prime = np.floor(x_hat_prime).astype(int)
+        return x_hat, x_hat_prime
+            
 
-        # print(self.e_mat)
-        # print(self.e_tildae)
-        return out_pts
-    
+    def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
+                           e_mat:np.ndarray, s_mat:np.ndarray,
+                           rot:np.ndarray, p_left:np.ndarray,
+                           p_right:np.ndarray)->np.ndarray:
+        """
+
+        Perform triangulation using niter2 algorithm for all 3D points.
+
+        Output: x_mat: [Kx3], 3D triangulated points
+        """
+        # Type checks, value checks
+        if not isinstance(left_pts, np.ndarray):
+            err_msg = "left_pts must be a Numpy array."
+            raise TypeError(err_msg)
+        if not isinstance(right_pts, np.ndarray):
+            err_msg = "right_pts must be a Numpy array."
+            raise TypeError(err_msg)
+        if not isinstance(e_mat, np.ndarray):
+            err_msg = "Essential matrix must be a Numpy array."
+            raise TypeError(err_msg)
+        if (left_pts.shape[0]!=right_pts.shape[0]):
+            err_msg = "keypoints matched between left and right images must be same!"
+            raise ValueError(err_msg)
+        if left_pts.shape[1]!=2 or right_pts.shape[1]!=2:
+            err_msg = "keypoints must be passed as a Nx2 numpy array"
+            raise ValueError(err_msg)
+
+        left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
+                                                                   e_mat, s_mat, rot)
+
+        left_pts_nit = left_pts_updated.astype(np.float32)
+        right_pts_nit = right_pts_updated.astype(np.float32)
+
+        print(f"left points: {left_pts_nit.shape[0]}, right points: {right_pts_nit.shape[0]}")  # noqa: E501
+        print()
+        print(left_pts_nit[:5])
+        print()
+        print(right_pts_nit[:5])
+
+
+    # TODO DEPRICATE does not work
     def compute_3d(self, e_mat:np.ndarray, x_hat:np.ndarray, x_hat_prime:np.ndarray,
                    rot:np.ndarray)->np.ndarray:
         """Compute 3D vector given pose and camera intrinsic."""
         # Initialize work variable
-        # TODO DEPRICATE does not work
         z = np.zeros(3, dtype=float)
         x_3d = np.zeros(3, dtype=float)
         z = np.cross(x_hat,np.dot(rot, x_hat_prime)) #[1x3]
@@ -566,15 +587,18 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # TODO convert these into a function
         
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
-        t0 = curr_time()
-        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        #t0 = curr_time()
+        #hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
         
         # t_hs = (curr_time() - t0)/1000 # seconds
         # hs_time.append(t_hs) # seconds
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
+        #niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
+        niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
+                           p_mat_left, p_mat_right)
+       
 
         # if show_verbose:
         #     print(f"Processed image pair: {pair_processed}")
