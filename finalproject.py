@@ -34,87 +34,87 @@ def curr_time():
     return time.monotonic() * 1000
 
 # @jit(nopython = True, fastmath = True)
-# def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
-#                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
-#                                                                       np.ndarray]:
-#         """
-#         Perform non-iterative update as shown in Section 5.
+def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
+                           e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
+                                                                      np.ndarray]:
+        """
+        Perform non-iterative update as shown in Section 5.
 
-#         Algorithm is shown in Listing 3 in the paper
+        Algorithm is shown in Listing 3 in the paper
 
-#         Args:
-#         left_pts:[Kx2], keypoint from left camera. Each row corresponds to x in paper
-#         right_pts:[Kx2], keypoint from right camera. Each row corresponds to x' in paper
-#         e_mat: [3x3]: essential matrix
-#         s_mat: [2x3]: matrix defined in Equation 4
-#         rot: [3x3]: Rotation matrix (obtained by decomposing essential matrix)
+        Args:
+        left_pts:[Kx2], keypoint from left camera. Each row corresponds to x in paper
+        right_pts:[Kx2], keypoint from right camera. Each row corresponds to x' in paper
+        e_mat: [3x3]: essential matrix
+        s_mat: [2x3]: matrix defined in Equation 4
+        rot: [3x3]: Rotation matrix (obtained by decomposing essential matrix)
 
-#         Output:
-#         x_hat: [Kx3] updated left points in homogeneous coord
-#         x_hat_prime: [Kx3] updated right points in homogeneous coord
-#         """
-#         # Initialize constant variables
-#         e_tildae = np.zeros((2,2), dtype=float)
-#         e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T)
-#         # Initialize work variables
-#         x = np.zeros(0, dtype=float) # in paper x \in R^3, homogeneous coord
-#         x_prime = np.zeros(0, dtype=float) # in paper x' \in R^3, homogeneous coord
-#         n = np.zeros(2, dtype=float) # [1x2] step direction for x
-#         n_prime = np.zeros(2, dtype=float) # [1x2] step direction for x'
-#         a = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
-#         b = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
-#         b_rhs = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
-#         c = np.zeros(1, dtype=float) # [1x1], x.T * E * x', scalar
-#         d = np.zeros(1, dtype=float) # [1x1], scalar
-#         lambda_ = np.zeros(1, dtype=float) # [1x1], scalar, step size
-#         del_x = np.zeros(3, dtype=float) # in paper delta_x \in R^3, hom coord
-#         del_x_prime = np.zeros(3, dtype=float) # in paper delta_x' \in R^3, hom coord
-#         x_hat = np.zeros((0,3), dtype=float) # [Kx3]
-#         x_hat_prime = np.zeros((0,3), dtype=float) # [Kx3]
+        Output:
+        x_hat: [Kx3] updated left points in homogeneous coord
+        x_hat_prime: [Kx3] updated right points in homogeneous coord
+        """
+        # Initialize constant variables
+        e_tildae = np.zeros((2,2), dtype=float)
+        e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T)
+        # Initialize work variables
+        x = np.zeros(0, dtype=float) # in paper x \in R^3, homogeneous coord
+        x_prime = np.zeros(0, dtype=float) # in paper x' \in R^3, homogeneous coord
+        n = np.zeros(2, dtype=float) # [1x2] step direction for x
+        n_prime = np.zeros(2, dtype=float) # [1x2] step direction for x'
+        a = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
+        b = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
+        b_rhs = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
+        c = np.zeros(1, dtype=float) # [1x1], x.T * E * x', scalar
+        d = np.zeros(1, dtype=float) # [1x1], scalar
+        lambda_ = np.zeros(1, dtype=float) # [1x1], scalar, step size
+        del_x = np.zeros(3, dtype=float) # in paper delta_x \in R^3, hom coord
+        del_x_prime = np.zeros(3, dtype=float) # in paper delta_x' \in R^3, hom coord
+        x_hat = np.zeros((0,3), dtype=float) # [Kx3]
+        x_hat_prime = np.zeros((0,3), dtype=float) # [Kx3]
 
-#         # Primary loop
-#         for i in range(left_pts.shape[0]):
-#             # Initialize variables for these keypoints pairs
-#             x = np.append(left_pts[i], 1)  # [1x3]
-#             x_prime = np.append(right_pts[i], 1)  # [1x3]
-#             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
-#             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
-#             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
-#             b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
-#             b = 0.5 * b_rhs # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
-#             c = np.dot(np.dot(x.T, e_mat),x_prime) # c = (x.T).E.x', epipolar constraint
-#             d = np.sqrt(b**2 - a * c) # d = sqrt(b**2 - a*c)
-#             lambda_ = c / (b + d) # lambda_ = c / (b+d)
-#             del_x = lambda_ * n # [1x3]
-#             del_x_prime = lambda_ * n_prime #[1x3]
-#             n = n - np.dot(e_tildae,del_x_prime) # n = n-E_tildae.delta_x'
-#             n_prime = n_prime - np.dot(e_tildae.T, del_x) # n' = n'-(E_tildae.T).delta_x
-#             if np.array_equal(algorithm, np.array([[2]], dtype=np.int8)):
-#                 # niter2
-#                 lambda_ = lambda_ * ((2*d)/b_rhs)
-#                 del_x = lambda_ * n # [1x3]
-#                 del_x_prime = lambda_ * n_prime #[1x3]
-#             else:
-#                 # niter1
-#                 pass
-#             # Corrected points <x_hat, x_hat_prime> in homogeneous coord
-#             x = x - np.dot(s_mat.T, del_x) # x_hat
-#             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
+        # Primary loop
+        for i in range(left_pts.shape[0]):
+            # Initialize variables for these keypoints pairs
+            x = np.append(left_pts[i], 1)  # [1x3]
+            x_prime = np.append(right_pts[i], 1)  # [1x3]
+            n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
+            n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
+            a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
+            b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
+            b = 0.5 * b_rhs # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
+            c = np.dot(np.dot(x.T, e_mat),x_prime) # c = (x.T).E.x', epipolar constraint
+            d = np.sqrt(b**2 - a * c) # d = sqrt(b**2 - a*c)
+            lambda_ = c / (b + d) # lambda_ = c / (b+d)
+            del_x = lambda_ * n # [1x3]
+            del_x_prime = lambda_ * n_prime #[1x3]
+            n = n - np.dot(e_tildae,del_x_prime) # n = n-E_tildae.delta_x'
+            n_prime = n_prime - np.dot(e_tildae.T, del_x) # n' = n'-(E_tildae.T).delta_x
+            if np.array_equal(algorithm, np.array([[2]], dtype=np.int8)):
+                # niter2
+                lambda_ = lambda_ * ((2*d)/b_rhs)
+                del_x = lambda_ * n # [1x3]
+                del_x_prime = lambda_ * n_prime #[1x3]
+            else:
+                # niter1
+                pass
+            # Corrected points <x_hat, x_hat_prime> in homogeneous coord
+            x = x - np.dot(s_mat.T, del_x) # x_hat
+            x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
 
-#             # Reshape to correct dimension, [1x3] from [3]
-#             x = np.reshape(x, (-1,3))
-#             x_prime = np.reshape(x_prime, (-1,3))
+            # Reshape to correct dimension, [1x3] from [3]
+            x = np.reshape(x, (-1,3))
+            x_prime = np.reshape(x_prime, (-1,3))
 
-#             # Push to matrix
-#             x_hat = np.vstack((x_hat, x))
-#             x_hat_prime = np.vstack((x_hat_prime, x_prime))
+            # Push to matrix
+            x_hat = np.vstack((x_hat, x))
+            x_hat_prime = np.vstack((x_hat_prime, x_prime))
 
-#         # Breaks with Numba
-#         #x_hat = np.floor(x_hat).astype(int)
-#         #x_hat_prime = np.floor(x_hat_prime).astype(int)
-#         return x_hat, x_hat_prime
+        # Breaks with Numba
+        #x_hat = np.floor(x_hat).astype(int)
+        #x_hat_prime = np.floor(x_hat_prime).astype(int)
+        return x_hat, x_hat_prime
 
-def _non_iter_update(algorithm: np.ndarray, left_pts: np.ndarray, right_pts: np.ndarray,
+def _non_iter_update_2(algorithm: np.ndarray, left_pts: np.ndarray, right_pts: np.ndarray,
                      e_mat: np.ndarray, s_mat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     """
     Perform non-iterative update as shown in Section 5.
@@ -134,28 +134,9 @@ def _non_iter_update(algorithm: np.ndarray, left_pts: np.ndarray, right_pts: np.
     # Initialize constant variables
     e_tildae = np.dot(np.dot(s_mat, e_mat), s_mat.T)
 
-    # Initialize variables
-    n = np.dot(s_mat, np.dot(e_mat, right_pts.T)).T  # [Kx2]
-    n_prime = np.dot(np.dot(s_mat, e_mat.T), left_pts.T).T  # [Kx2]
-    b_rhs = np.sum(n ** 2, axis=1) + np.sum(n_prime ** 2, axis=1)  # [Kx1]
-
-    # Compute lambda
-    a = np.sum(n * e_tildae @ n_prime.T, axis=1)  # [Kx1]
-    c = np.sum(np.dot(left_pts, e_mat) * right_pts, axis=1)  # [Kx1]
-    d = np.sqrt(b_rhs ** 2 - 4 * a * c)  # [Kx1]
-    lambda_ = c / (2 * a + d)  # [Kx1]
-
-    # Update points
-    del_x = lambda_[:, np.newaxis] * n  # [Kx2]
-    del_x_prime = lambda_[:, np.newaxis] * n_prime  # [Kx2]
-    x_hat = left_pts - np.dot(s_mat.T, del_x.T).T  # [Kx2]
-    x_hat_prime = right_pts - np.dot(s_mat.T, del_x_prime.T).T  # [Kx2]
-
-    # Add homogeneous coordinate
-    x_hat = np.column_stack((x_hat, np.ones(len(x_hat))))  # [Kx3]
-    x_hat_prime = np.column_stack((x_hat_prime, np.ones(len(x_hat_prime))))  # [Kx3]
-
-    return x_hat, x_hat_prime
+    # <x, x'> in a vectorized manner
+    left_pts_hom = np.column_stack((left_pts, np.ones((len(left_pts), 1))))  # [Kx3]
+    right_pts_hom = np.column_stack((right_pts, np.ones((len(right_pts), 1))))  # [Kx3]
 
 
 class Niter2:
