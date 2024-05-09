@@ -146,20 +146,16 @@ class Niter2:
             # Initialize variables for these keypoints pairs
             x = np.append(np.copy(left_pts[i]), 1)  # [1x3]
             x_prime = np.append(np.copy(right_pts[i]), 1)  # [1x3]
-
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
-
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
             b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
             b = 0.5 * b_rhs # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
             c = np.dot(np.dot(x.T, e_mat),x_prime) # c = (x.T).E.x', epipolar constraint
             d = np.sqrt(b**2 - a * c) # d = sqrt(b**2 - a*c)
-
             lambda_ = c / (b + d) # lambda_ = c / (b+d)
             del_x = lambda_ * n # [1x3]
             del_x_prime = lambda_ * n_prime #[1x3]
-
             n = n - np.dot(e_tildae,del_x_prime) # n = n-E_tildae.delta_x'
             n_prime = n_prime - np.dot(e_tildae.T, del_x) # n' = n'-(E_tildae.T).delta_x
             if np.array_equal(self.algorithm, np.array([[2]], dtype=np.int8)):
@@ -174,7 +170,7 @@ class Niter2:
             x = x - np.dot(s_mat.T, del_x) # x_hat
             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
             x_3d = self.compute_3d(e_mat, x, x_prime, rot) # [1x3]
-            out_pts = np.vstack(out_pts, x_3d)
+            out_pts=np.vstack((out_pts, x_3d)) # Push to array
             # DEBUG
             # print(f"x: {left_pts[i]}")
             # print(f"x': {right_pts[i]}")
@@ -183,15 +179,17 @@ class Niter2:
             # print(f"x_hat': {x_prime}")
             # print()
             # print(f"x_3d: {x_3d}")
-
             break
 
         # print(self.e_mat)
         # print(self.e_tildae)
+        return out_pts
+    
     def compute_3d(self, e_mat:np.ndarray, x_hat:np.ndarray, x_hat_prime:np.ndarray,
                    rot:np.ndarray)->np.ndarray:
         """Compute 3D vector given pose and camera intrinsic."""
         # Initialize work variable
+        # TODO DEPRICATE does not work
         z = np.zeros(3, dtype=float)
         x_3d = np.zeros(3, dtype=float)
         z = np.cross(x_hat,np.dot(rot, x_hat_prime)) #[1x3]
@@ -567,23 +565,29 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         
         # TODO convert these into a function
         
-        # p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
-        # t0 = curr_time()
-        # hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
+        t0 = curr_time()
+        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        
         # t_hs = (curr_time() - t0)/1000 # seconds
         # hs_time.append(t_hs) # seconds
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
+        niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
 
         # if show_verbose:
         #     print(f"Processed image pair: {pair_processed}")
         #     print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
         #     print(f"t_hs: {t_hs} s")
         pair_processed+=1
+        p_mat_left = np.copy(p_mat_right)
         break
 
+    print(hs_pts3d[:5])
+    print()
+    print(niter_pts3d[:5])
+    
     # Print statistics
     # print()
     # hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
