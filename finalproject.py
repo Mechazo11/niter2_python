@@ -153,14 +153,7 @@ class Niter2:
             # Push to matrix
             x_hat = np.vstack((x_hat, x))
             x_hat_prime = np.vstack((x_hat_prime, x_prime))
-            # DEBUG
-            # print(f"x: {left_pts[i]}")
-            # print(f"x': {right_pts[i]}")
-            # print()
-            # print(f"x_hat: {x}")
-            # print(f"x_hat': {x_prime}")
-            # print()
-            # print(f"x_3d: {x_3d}")
+
         x_hat = np.floor(x_hat).astype(int)
         x_hat_prime = np.floor(x_hat_prime).astype(int)
         return x_hat, x_hat_prime
@@ -217,19 +210,6 @@ class Niter2:
         _pts4d_hom = _pts4d_hom / np.tile(_pts4d_hom[-1, :], (4, 1))
         _pts3d = _pts4d_hom[:3, :].T # [Nx3], [x,y,z]
         return _pts3d
-
-    # TODO DEPRICATE does not work
-    def compute_3d(self, e_mat:np.ndarray, x_hat:np.ndarray, x_hat_prime:np.ndarray,
-                   rot:np.ndarray)->np.ndarray:
-        """Compute 3D vector given pose and camera intrinsic."""
-        # Initialize work variable
-        z = np.zeros(3, dtype=float)
-        x_3d = np.zeros(3, dtype=float)
-        z = np.cross(x_hat,np.dot(rot, x_hat_prime)) #[1x3]
-        x_num = np.dot(np.dot(z.T, e_mat),x_hat_prime)
-        x_deno = np.dot(z.T,z)
-        x_3d = (x_num / x_deno) * x_hat
-        return x_3d
 
 class DataSetLoader:
     """
@@ -521,22 +501,43 @@ def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray,
     hs_pts3d = hs_pts4d_hom[:3, :].T # [Nx3], [x,y,z]
     return hs_pts3d
 
-def plot_on_3d(hs_pts3d:np.ndarray)->None:
-    """
-    Plot 3D points using on an isometric plot.
-    
-    TODO add another variable to allow plotting 3d points from both
-    """
+# def plot_on_3d(hs_pts3d:np.ndarray, niter2_pts3d:np.ndarray)->None:
+#     """Plot 3D points for both methods using an isometric plot."""
+#     # Configure plot
+#     fig = plt.figure()
+#     ax = fig.add_subplot(projection='3d')
+#     xs = hs_pts3d[:, 0]
+#     ys = hs_pts3d[:, 1]
+#     zs = hs_pts3d[:, 2]
+#     ax.scatter(xs, ys, zs)
+#     ax.set_xlabel('X')
+#     ax.set_ylabel('Y ')
+#     ax.set_zlabel('Z')
+#     plt.show()
+
+def plot_on_3d(hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
+    """Plot 3D points for both methods using an isometric plot."""
     # Configure plot
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
+
+    # Plot hs_pts3d points
     xs = hs_pts3d[:, 0]
     ys = hs_pts3d[:, 1]
     zs = hs_pts3d[:, 2]
-    ax.scatter(xs, ys, zs)
+    ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
+
+    # Plot niter2_pts3d points in orange
+    xs_niter2 = niter2_pts3d[:, 0]
+    ys_niter2 = niter2_pts3d[:, 1]
+    zs_niter2 = niter2_pts3d[:, 2]
+    ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red', marker='+')
+
+    # Set labels
     ax.set_xlabel('X')
-    ax.set_ylabel('Y ')
+    ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    ax.legend()
     plt.show()
 
 def show_stereo_images(left_img:np.ndarray, right_img:np.ndarray):
@@ -572,10 +573,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         s_mat = np.array([[1,0,0], [0,1,0]], dtype=float)
         p_mat_right = np.zeros((3,4), dtype=float)
         rot1 = np.zeros((3,3), dtype=float)
-        rot2 = np.zeros((3,3), dtype=float)
+        #rot2 = np.zeros((3,3), dtype=float)
         tvec = np.zeros(3, dtype=float)
         hs_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d poits in homogeneous coord
-        niter_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in homogeneous coord
+        niter2_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in homogeneous coord
 
         # paths to left and right image
         lp = dataloader.image_path_lss[i]
@@ -589,7 +590,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
                                                       right_img)
         f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
         e_mat = compute_essential_matrix(f_mat, k_mat)
-        rot1, rot2, tvec = cv2.decomposeEssentialMat(e_mat)
+        rot1, _, tvec = cv2.decomposeEssentialMat(e_mat)
         
         # If not converted to float32, cv2.triangulate points crashes kernel
         # All points [Nx2] here
@@ -597,41 +598,36 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         right_pts = right_pts.astype(np.float32)
         
         # TODO convert these into a function
-        
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
-        #t0 = curr_time()
-        #hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        
-        # t_hs = (curr_time() - t0)/1000 # seconds
-        # hs_time.append(t_hs) # seconds
-        # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
-        # plot_on_3d(hs_pts3d)
+        t0 = curr_time()
+        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        t_hs = (curr_time() - t0)/1000 # seconds
+        hs_time.append(t_hs) # seconds
+        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
 
-        niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
+        t1 = curr_time()
+        niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
                                          p_mat_left, p_mat_right)
-        # niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
-        #                    p_mat_left, p_mat_right)
+        t_niter2 = (curr_time() - t1)/1000 # seconds
        
-
-        # if show_verbose:
-        #     print(f"Processed image pair: {pair_processed}")
-        #     print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
-        #     print(f"t_hs: {t_hs} s")
+        
+        if show_verbose:
+            print(f"Processed image pair: {pair_processed}")
+            print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
+            print(f"niter2: triangulated points: {niter2_pts3d.shape[0]}")
+            print(f"t_hs: {t_hs} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
-        break
+        break # Only do one image pair
 
-    # print(hs_pts3d[:5])
-    print()
-    print(niter_pts3d[:5])
-    
     # Print statistics
-    # print()
-    # hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
-    # hs_total_time = np.sum(np.asarray(hs_time))
-    # hs_pts_sec = hs_total_pts / hs_total_time
-    # print(f"Total pts triangulated hs {hs_total_pts}")
-    # print(f"Total time hs {hs_total_time:.3f}")
-    # print(f"points/sec hs: {int(hs_pts_sec)}")
-    # print()
+    print()
+    hs_total_pts = np.sum(np.asarray(triangualted_pts_hs))
+    hs_total_time = np.sum(np.asarray(hs_time))
+    hs_pts_sec = hs_total_pts / hs_total_time
+    print(f"Total pts triangulated hs {hs_total_pts}")
+    print(f"Total time hs {hs_total_time:.3f}")
+    print(f"points/sec hs: {int(hs_pts_sec)}")
+    print()
+    plot_on_3d(hs_pts3d, niter2_pts3d)
     # cv2.destroyAllWindows()
