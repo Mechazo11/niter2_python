@@ -85,8 +85,8 @@ class Niter2:
         # self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
 
     def non_iter_update(self,left_pts:np.ndarray, right_pts:np.ndarray,
-                           e_mat:np.ndarray, s_mat:np.ndarray,
-                           rot:np.ndarray)->Tuple[np.ndarray, np.ndarray]:
+                           e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
+                                                                      np.ndarray]:
         """
         Perform non-iterative update as shown in Section 5.
 
@@ -107,8 +107,8 @@ class Niter2:
         e_tildae = np.zeros((2,2), dtype=float)
         e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T)
         # Initialize work variables
-        x = np.zeros(3, dtype=float) # in paper x \in R^3, homogeneous coord
-        x_prime = np.zeros(3, dtype=float) # in paper x' \in R^3, homogeneous coord
+        x = np.zeros(0, dtype=float) # in paper x \in R^3, homogeneous coord
+        x_prime = np.zeros(0, dtype=float) # in paper x' \in R^3, homogeneous coord
         n = np.zeros(2, dtype=float) # [1x2] step direction for x
         n_prime = np.zeros(2, dtype=float) # [1x2] step direction for x'
         a = np.zeros(1, dtype=float) # [1x1] scalar for computing \lambda
@@ -125,8 +125,8 @@ class Niter2:
         # Primary loop
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
-            x = np.append(np.copy(left_pts[i]), 1)  # [1x3]
-            x_prime = np.append(np.copy(right_pts[i]), 1)  # [1x3]
+            x = np.append(left_pts[i], 1)  # [1x3]
+            x_prime = np.append(right_pts[i], 1)  # [1x3]
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
@@ -152,7 +152,7 @@ class Niter2:
             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
             # Push to matrix
             x_hat = np.vstack((x_hat, x))
-            x_hat_prime = np.vstack((x_hat, x_prime))
+            x_hat_prime = np.vstack((x_hat_prime, x_prime))
             # DEBUG
             # print(f"x: {left_pts[i]}")
             # print(f"x': {right_pts[i]}")
@@ -193,18 +193,29 @@ class Niter2:
             err_msg = "keypoints must be passed as a Nx2 numpy array"
             raise ValueError(err_msg)
 
+        out_pts3d = np.zeros((0,3), dtype=float)
         left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
-                                                                   e_mat, s_mat, rot)
-
+                                                                   e_mat, s_mat)
         left_pts_nit = left_pts_updated.astype(np.float32)
         right_pts_nit = right_pts_updated.astype(np.float32)
+        
+        print(left_pts_nit.shape[0])
+        print(right_pts_nit.shape[0])
 
-        print(f"left points: {left_pts_nit.shape[0]}, right points: {right_pts_nit.shape[0]}")  # noqa: E501
-        print()
-        print(left_pts_nit[:5])
-        print()
-        print(right_pts_nit[:5])
+        # Call OpenCV triangulate to find 3D points
+        # out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
+        return out_pts3d
 
+    def opencv_triangulate(self, pts1:np.ndarray, pts2:np.ndarray, 
+                    proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
+        """Call OpenCV triangulate method to use updated keypoints."""
+        _pts3d = np.zeros((0,3), dtype=float)
+        _pts4d_hom = np.zeros((0,4), dtype=float)
+        _pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
+        ##Convert 4d homogeneous coordinates to 3d coordinate
+        _pts4d_hom = _pts4d_hom / np.tile(_pts4d_hom[-1, :], (4, 1))
+        _pts3d = _pts4d_hom[:3, :].T # [Nx3], [x,y,z]
+        return _pts3d
 
     # TODO DEPRICATE does not work
     def compute_3d(self, e_mat:np.ndarray, x_hat:np.ndarray, x_hat_prime:np.ndarray,
@@ -562,8 +573,8 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         rot1 = np.zeros((3,3), dtype=float)
         rot2 = np.zeros((3,3), dtype=float)
         tvec = np.zeros(3, dtype=float)
-        hs_pts3d = np.zeros(0, dtype=float) # [Kx4] 3d poits in homogeneous coord
-        niter_pts3d = np.zeros(0, dtype=float) # [Kx4] 3d points in homogeneous coord
+        hs_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d poits in homogeneous coord
+        niter_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in homogeneous coord
 
         # paths to left and right image
         lp = dataloader.image_path_lss[i]
@@ -595,9 +606,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
         # plot_on_3d(hs_pts3d)
 
-        #niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1)
-        niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
-                           p_mat_left, p_mat_right)
+        niter_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
+                                         p_mat_left, p_mat_right)
+        # niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
+        #                    p_mat_left, p_mat_right)
        
 
         # if show_verbose:
@@ -608,7 +620,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         p_mat_left = np.copy(p_mat_right)
         break
 
-    print(hs_pts3d[:5])
+    # print(hs_pts3d[:5])
     print()
     print(niter_pts3d[:5])
     
