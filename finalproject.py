@@ -157,7 +157,6 @@ class Niter2:
         x_hat = np.floor(x_hat).astype(int)
         x_hat_prime = np.floor(x_hat_prime).astype(int)
         return x_hat, x_hat_prime
-            
 
     def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray,
@@ -598,6 +597,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         t_hs = (curr_time() - t0)/1000 # seconds
         hs_time.append(t_hs) # seconds
         triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        
         # Triangulate using non-iterative niter2 method
         t1 = curr_time()
         niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
@@ -614,7 +614,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
-        # break # Only do one image pair
+        break # Only do one image pair
 
     # Print statistics
     
@@ -625,5 +625,5 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
     # TODO mean relative error
     print()
-    plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
+    # plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
     # cv2.destroyAllWindows()
