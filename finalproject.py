@@ -33,7 +33,7 @@ def curr_time():
     """Return the time tick in milliseconds."""
     return time.monotonic() * 1000
 
-@jit(nopython = True, parallel = False)
+#@jit(nopython = True, parallel = False)
 def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -73,12 +73,16 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
         x_hat_prime = np.zeros((0,3), dtype=float) # [Kx3]
 
         # Primary loop
+        idx = 0
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
             x = np.append(left_pts[i], 1)  # [1x3]
             x_prime = np.append(right_pts[i], 1)  # [1x3]
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
+            
+            print(f"n: {n}, n_prime: {n_prime}")
+
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
             b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
             b = 0.5 * b_rhs # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
@@ -108,11 +112,29 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             # Push to matrix
             x_hat = np.vstack((x_hat, x))
             x_hat_prime = np.vstack((x_hat_prime, x_prime))
+            #DEBUG
+
+            idx+=1
+            if (idx>4):
+                break
 
         # Breaks with Numba
         #x_hat = np.floor(x_hat).astype(int)
         #x_hat_prime = np.floor(x_hat_prime).astype(int)
         return x_hat, x_hat_prime
+
+def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
+                           e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
+                                                                      np.ndarray]:
+    """Vectorized version of _non_iter_update()."""
+    
+    """
+        * Make pts from 2D to 3D homogeneized
+    """
+    
+    arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1)
+    x_mat = np.hstack((left_pts, arr_add))
+    print(x_mat)
 
 class Niter2:
     """
@@ -186,6 +208,14 @@ class Niter2:
         x_hat_prime: [Kx3] updated right points in homogeneous coord
         """
         # Initialize constant variables
+        
+        print(left_pts[:5])
+        print()
+        print(right_pts[:5])
+        print()
+        print(e_mat)
+        print()
+        
         x_hat, x_hat_prime = _non_iter_update(self.algorithm, left_pts, right_pts,
                                               e_mat,s_mat)
         return x_hat, x_hat_prime
@@ -218,11 +248,11 @@ class Niter2:
             raise ValueError(err_msg)
 
         out_pts3d = np.zeros((0,3), dtype=float)
-        t00 = curr_time()
+        #t00 = curr_time()
         left_pts_updated, right_pts_updated = self.non_iter_update(np.copy(left_pts),
                                                                    np.copy(right_pts),
                                                                    e_mat, s_mat)
-        print(f"non_iter_update: {curr_time() - t00} ms")
+        #print(f"non_iter_update: {curr_time() - t00} ms")
         
         # left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
         #                                                            e_mat, s_mat)
@@ -236,7 +266,7 @@ class Niter2:
         # Call OpenCV triangulate to find 3D points
         t00 = curr_time()
         out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
-        print(f"opencv_triangulate: {curr_time() - t00} ms")
+        #print(f"opencv_triangulate: {curr_time() - t00} ms")
         
         return out_pts3d
 
@@ -634,12 +664,12 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
 
         # Triangulate using optimal triangulation method
-        t0 = curr_time()
-        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        #t_hs = (curr_time() - t0)/1000 # seconds
-        t_hs = (curr_time() - t0) # ms
-        hs_time.append(t_hs) # seconds
-        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        # t0 = curr_time()
+        # hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        # #t_hs = (curr_time() - t0)/1000 # seconds
+        # t_hs = (curr_time() - t0) # ms
+        # hs_time.append(t_hs) # seconds
+        # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
 
         # Triangulate using non-iterative niter2 method
         t1 = curr_time()
@@ -658,16 +688,16 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
-        # break # Only do one image pair
+        break # Only do one image pair
 
     # Print statistics
 
-    hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
-    niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
-    print()
-    print(f"points/sec by hs method: {int(hs_pts_sec)}")
-    print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
-    # TODO mean relative error
-    print()
+    # hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
+    # niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
+    # print()
+    # print(f"points/sec by hs method: {int(hs_pts_sec)}")
+    # print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
+    # # TODO mean relative error
+    # print()
     # plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
     # cv2.destroyAllWindows()
