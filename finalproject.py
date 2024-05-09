@@ -33,7 +33,7 @@ def curr_time():
     """Return the time tick in milliseconds."""
     return time.monotonic() * 1000
 
-# @jit(nopython = True, fastmath = True)
+@jit(nopython = True, parallel = False)
 def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -114,31 +114,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
         #x_hat_prime = np.floor(x_hat_prime).astype(int)
         return x_hat, x_hat_prime
 
-def _non_iter_update_2(algorithm: np.ndarray, left_pts: np.ndarray, right_pts: np.ndarray,
-                     e_mat: np.ndarray, s_mat: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Perform non-iterative update as shown in Section 5.
-
-    Algorithm is shown in Listing 3 in the paper
-
-    Args:
-    left_pts: [Kx2], keypoint from left camera. Each row corresponds to x in paper
-    right_pts: [Kx2], keypoint from right camera. Each row corresponds to x' in paper
-    e_mat: [3x3]: essential matrix
-    s_mat: [2x3]: matrix defined in Equation 4
-
-    Output:
-    x_hat: [Kx3] updated left points in homogeneous coord
-    x_hat_prime: [Kx3] updated right points in homogeneous coord
-    """
-    # Initialize constant variables
-    e_tildae = np.dot(np.dot(s_mat, e_mat), s_mat.T)
-
-    # <x, x'> in a vectorized manner
-    left_pts_hom = np.column_stack((left_pts, np.ones((len(left_pts), 1))))  # [Kx3]
-    right_pts_hom = np.column_stack((right_pts, np.ones((len(right_pts), 1))))  # [Kx3]
-
-
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
@@ -169,9 +144,6 @@ class Niter2:
     is at z = +1, then the argument f should be negated (alternatively, all
     subtractions of f in the function could be changed to additions).
 
-    Args:
-    TODO
-    
     """
 
     def __init__(self, algorithm:str = "niter2") -> None:
@@ -247,7 +219,8 @@ class Niter2:
 
         out_pts3d = np.zeros((0,3), dtype=float)
         t00 = curr_time()
-        left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
+        left_pts_updated, right_pts_updated = self.non_iter_update(np.copy(left_pts),
+                                                                   np.copy(right_pts),
                                                                    e_mat, s_mat)
         print(f"non_iter_update: {curr_time() - t00} ms")
         
@@ -685,10 +658,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
-        break # Only do one image pair
+        # break # Only do one image pair
 
     # Print statistics
-    
+
     hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
     niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
     print()
