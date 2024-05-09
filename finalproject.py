@@ -196,21 +196,22 @@ class Niter2:
         out_pts3d = np.zeros((0,3), dtype=float)
         left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
                                                                    e_mat, s_mat)
+        # in homogeneous coordinates
         left_pts_nit = left_pts_updated.astype(np.float32)
         right_pts_nit = right_pts_updated.astype(np.float32)
-        
-        print(left_pts_nit.shape[0])
-        print(right_pts_nit.shape[0])
+        # covnert to 2D coordinate
+        left_pts_nit = left_pts_nit[:, :2]
+        right_pts_nit = right_pts_nit[:, :2]
 
         # Call OpenCV triangulate to find 3D points
-        # out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
+        out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
         return out_pts3d
 
     def opencv_triangulate(self, pts1:np.ndarray, pts2:np.ndarray, 
                     proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
         """Call OpenCV triangulate method to use updated keypoints."""
-        _pts3d = np.zeros((0,3), dtype=float)
-        _pts4d_hom = np.zeros((0,4), dtype=float)
+        # _pts3d = np.zeros((0,3), dtype=float)
+        # _pts4d_hom = np.zeros((0,4), dtype=float)
         _pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
         ##Convert 4d homogeneous coordinates to 3d coordinate
         _pts4d_hom = _pts4d_hom / np.tile(_pts4d_hom[-1, :], (4, 1))
