@@ -81,6 +81,7 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
             
+            #print(f"n: {n.shape}, n_prime: {n_prime.shape}")
             print(f"n: {n}, n_prime: {n_prime}")
 
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
@@ -133,8 +134,16 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     """
     
     arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1)
-    x_mat = np.hstack((left_pts, arr_add))
-    print(x_mat)
+    x_mat = np.hstack((left_pts, arr_add)) # [Kx3]
+    x_mat_prime = np.hstack((right_pts, arr_add)) # [Kx3]
+    # Find directions
+    n_mat = np.dot(x_mat_prime,np.dot(s_mat, e_mat).T)
+    n_mat_prime = np.dot(x_mat,np.dot(s_mat, e_mat.T).T)
+    print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
+    print(n_mat[:5])
+    print()
+    print(n_mat_prime[:5])
+
 
 class Niter2:
     """
