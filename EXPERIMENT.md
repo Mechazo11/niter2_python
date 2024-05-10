@@ -35,7 +35,11 @@ On the house dataset compare against the ground truth
 
 8. Apply Lindstorms's code and compute map points
 
+8b. Compute $X\in R^3$ position by solving $x = P.X$ problem using non linear
+least squares approach. Based on this [gist](https://gist.github.com/davegreenwood/e1d2227d08e24cc4e353d95d0c18c914)
+
 9. Record stats for point/sec
+10. Record RMSE of triangulated points
 
 # Important resources for implementation
 

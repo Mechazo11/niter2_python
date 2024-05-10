@@ -33,7 +33,7 @@ def curr_time():
     """Return the time tick in milliseconds."""
     return time.monotonic() * 1000
 
-#@jit(nopython = True, parallel = False)
+@jit(nopython = True, parallel = False)
 def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -72,7 +72,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
         x_hat_prime = np.zeros((0,3), dtype=float) # [Kx3]
 
         # Primary loop
-        idx = 0
         for i in range(left_pts.shape[0]):
             # Initialize variables for these keypoints pairs
             x = np.append(left_pts[i], 1)  # [1x3]
@@ -205,14 +204,13 @@ class Niter2:
         """
         Perform non-iterative update as shown in Section 5.
 
-        Calls numba accelerated _non_iter_update() method
-
         Output:
         x_hat: [Kx3] updated left points in homogeneous coord
         x_hat_prime: [Kx3] updated right points in homogeneous coord
         """
         # Initialize constant variables
-        x_hat, x_hat_prime = _non_iter_vectorized(self.algorithm, left_pts, right_pts,
+        # Accelerated by numba
+        x_hat, x_hat_prime = _non_iter_update(self.algorithm, left_pts, right_pts,
                                               e_mat,s_mat)
 
         return x_hat, x_hat_prime
@@ -220,7 +218,8 @@ class Niter2:
     def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray,
                            rot:np.ndarray, p_left:np.ndarray,
-                           p_right:np.ndarray)->np.ndarray:
+                           p_right:np.ndarray,
+                           show_time_stat:bool = False)->np.ndarray:
         """
 
         Perform triangulation using niter2 algorithm for all 3D points.
@@ -249,21 +248,31 @@ class Niter2:
         left_pts_updated, right_pts_updated = self.non_iter_update(np.copy(left_pts),
                                                                    np.copy(right_pts),
                                                                    e_mat, s_mat)
-        print(f"non_iter_update: {curr_time() - t00} ms")
-        # in homogeneous coordinates
-        # left_pts_nit = left_pts_updated.astype(np.float32)
-        # right_pts_nit = right_pts_updated.astype(np.float32)
+        t_iter_up = curr_time() - t00
+        
+        # In homogeneous coordinates
+        left_pts_updated = left_pts_updated.astype(float)
+        left_pts_updated = right_pts_updated.astype(float)
+        
+        # TODO delete this and replace with DLT, will work with 3D homogeneous points
+        
         # covnert to 2D coordinate
         left_pts_nit = left_pts_updated[:, :2]
         right_pts_nit = right_pts_updated[:, :2]
 
         # Call OpenCV triangulate to find 3D points
+        
         t00 = curr_time()
-        out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
-        print(f"opencv_triangulate: {curr_time() - t00} ms")
+        out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, 
+                                            p_left, p_right)
+        
+        if show_time_stat:
+            print(f"non_iter_update: {t_iter_up} ms")
+            print(f"opencv_triangulate: {curr_time() - t00} ms")
         
         return out_pts3d
 
+    # TODO depreciate once DLT method is tested to work correctly
     def opencv_triangulate(self, pts1:np.ndarray, pts2:np.ndarray, 
                     proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
         """Call OpenCV triangulate method to use updated keypoints."""
@@ -606,8 +615,9 @@ def compute_points_per_sec(lss_pts:List[np.ndarray], lss_time:List[float])->floa
     return _pts_sec
 
 def test_pipeline(dataset_name: str, feature_detector:str,
-                  show_verbose:bool = False)->None:
-    """Test pipeline."""
+                  full_verbose:bool = False,
+                  short_verbose:bool = False)->None:
+    """Perform full experiment."""
     # Intialize variables
     pair_processed = 1
     # Triangulate with niter2
@@ -623,8 +633,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     niter2_time = []
 
     # Cycle through pairwise images
+    # TODO add start_idx to be read from dataset.yaml file
     start_idx = 15 # Trial and error, the scale is mostly stable now
     for i in range(start_idx, dataloader.num_images - 1):
+        # Initialize variables
         left_img = None
         right_img = None
         left_pts, right_pts = [],[]
@@ -638,7 +650,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         hs_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d poits in homogeneous coord
         niter2_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in homogeneous coord
 
-        # paths to left and right image
+        # Paths to left and right image
         lp = dataloader.image_path_lss[i]
         rp = dataloader.image_path_lss[i+1]
         left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
@@ -659,29 +671,36 @@ def test_pipeline(dataset_name: str, feature_detector:str,
 
         ## Triangulate using optimal triangulation method
         t0 = curr_time()
+
         hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+
         t_hs = (curr_time() - t0)/1000 # seconds
-        #t_hs = (curr_time() - t0) # ms
         hs_time.append(t_hs) # seconds
         triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
 
         ## Triangulate using non-iterative niter2 method
         t1 = curr_time()
+
         niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
-                                         p_mat_left, p_mat_right)
+                                         p_mat_left, p_mat_right,
+                                         show_time_stat=False)
+
         triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         t_niter2 = (curr_time() - t1)/1000 # seconds
-        # t_niter2 = (curr_time() - t1) # ms
         niter2_time.append(t_niter2) # seconds
+        
 
-        if show_verbose:
-            print(f"Processed image pair: {pair_processed}")
+        if full_verbose:
+            #print(f"Processed image pair: {pair_processed}")
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
             print(f"niter2: triangulated points: {niter2_pts3d.shape[0]}")
             print(f"t_hs: {t_hs} s")
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
+        # short verbose message
+        if short_verbose:
+            print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
         # break # Only do one image pair
 
     # Print statistics
@@ -692,5 +711,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
     # TODO mean relative error
     print()
-    plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
-    cv2.destroyAllWindows()
+    # TODO this needs to be corrected, comes out all wrong
+    # TODO save that plot where agreement was best
+    #plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
+    #cv2.destroyAllWindows()
