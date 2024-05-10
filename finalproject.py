@@ -130,11 +130,6 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
     """Vectorized version of _non_iter_update()."""
-    
-    """
-        *TODO if this works, put the correct dimensions to the right of each lines
-    """
-    
     e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T) # [2x2]
     arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1) # [Kx1]
     x_mat = np.hstack((left_pts, arr_add)) # [Kx3]
@@ -164,12 +159,7 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # Corrected x_mat and x_mat_prime
     x_mat = x_mat - np.dot(s_mat.T, delta_x.T).T # [Kx3] - [Kx3]
     x_mat_prime = x_mat_prime - np.dot(s_mat.T, delta_x_prime.T).T # [Kx3] - [Kx3]
-    
-    #print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
-    #print(f"a shape: {a.shape}, b shape: {b.shape}, c shape {c.shape}, d shape: {d.shape}")
-    print()
-    print(x_mat)
-    print(x_mat_prime)
+    return x_mat, x_mat_prime
 
 
 
@@ -245,16 +235,13 @@ class Niter2:
         x_hat_prime: [Kx3] updated right points in homogeneous coord
         """
         # Initialize constant variables
+    
+        # x_hat, x_hat_prime = _non_iter_update(self.algorithm, left_pts, right_pts,
+        #                                       e_mat,s_mat) # Functional, gives correct solution
         
-        print(left_pts[:5])
-        print()
-        print(right_pts[:5])
-        print()
-        print(e_mat)
-        print()
-        
-        x_hat, x_hat_prime = _non_iter_update(self.algorithm, left_pts, right_pts,
+        x_hat, x_hat_prime = _non_iter_vectorized(self.algorithm, left_pts, right_pts,
                                               e_mat,s_mat)
+
         return x_hat, x_hat_prime
 
     def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
@@ -285,11 +272,11 @@ class Niter2:
             raise ValueError(err_msg)
 
         out_pts3d = np.zeros((0,3), dtype=float)
-        #t00 = curr_time()
+        t00 = curr_time()
         left_pts_updated, right_pts_updated = self.non_iter_update(np.copy(left_pts),
                                                                    np.copy(right_pts),
                                                                    e_mat, s_mat)
-        #print(f"non_iter_update: {curr_time() - t00} ms")
+        print(f"non_iter_update: {curr_time() - t00} ms")
         
         # left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
         #                                                            e_mat, s_mat)
@@ -303,7 +290,7 @@ class Niter2:
         # Call OpenCV triangulate to find 3D points
         t00 = curr_time()
         out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, p_left, p_right)
-        #print(f"opencv_triangulate: {curr_time() - t00} ms")
+        print(f"opencv_triangulate: {curr_time() - t00} ms")
         
         return out_pts3d
 
@@ -700,21 +687,21 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         right_pts = right_pts.astype(np.float32)
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
 
-        # Triangulate using optimal triangulation method
-        # t0 = curr_time()
-        # hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        # #t_hs = (curr_time() - t0)/1000 # seconds
-        # t_hs = (curr_time() - t0) # ms
-        # hs_time.append(t_hs) # seconds
-        # triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        ## Triangulate using optimal triangulation method
+        t0 = curr_time()
+        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        t_hs = (curr_time() - t0)/1000 # seconds
+        #t_hs = (curr_time() - t0) # ms
+        hs_time.append(t_hs) # seconds
+        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
 
-        # Triangulate using non-iterative niter2 method
+        ## Triangulate using non-iterative niter2 method
         t1 = curr_time()
         niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
                                          p_mat_left, p_mat_right)
         triangulated_pts_niter2.append(niter2_pts3d.shape[0])
-        #t_niter2 = (curr_time() - t1)/1000 # seconds
-        t_niter2 = (curr_time() - t1) # ms
+        t_niter2 = (curr_time() - t1)/1000 # seconds
+        # t_niter2 = (curr_time() - t1) # ms
         niter2_time.append(t_niter2) # seconds
 
         if show_verbose:
