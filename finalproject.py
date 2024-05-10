@@ -751,6 +751,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     # Print statistics
     hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
     niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
+    # TODO a separate class to store and process results
     print()
     print(f"points/sec by hs method: {int(hs_pts_sec)}")
     print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
