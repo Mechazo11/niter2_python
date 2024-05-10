@@ -183,30 +183,6 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
 
-#@jit(nopython = True, parallel = False)
-# def _triangulate_nviews(p_lss:List[np.ndarray],ip_lss:List[np.ndarray])->np.ndarray:
-#         """
-#         Triangulate a point visible in n camera views.
-
-#         Numba accelerated
-
-#         p_lss is a list of camera projection matrices.
-#         ip_lss is a list of homogenised image points. eg [ [x, y, 1], [x, y, 1] ], OR,
-#         ip_lss is a 2d array - shape nx3 - [ [x, y, 1], [x, y, 1] ]
-#         len of ip must be the same as len of P
-#         """
-#         # if not len(ip_lss) == len(p_lss):
-#         #     err_msg = "Number of points and number of cameras not equal."
-#         #     raise ValueError(err_msg)
-#         n = len(p_lss)
-#         m_mat = np.zeros([3*n, 4+n])
-#         for i, (x, p) in enumerate(zip(ip_lss, p_lss)):
-#             m_mat[3*i:3*i+3, :4] = p
-#             m_mat[3*i:3*i+3, 4+i] = -x
-#         v = np.linalg.svd(m_mat)[-1]
-#         x_3d = v[-1, :4]
-#         return x_3d / x_3d[3] # 4D coordinate
-
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
@@ -252,6 +228,8 @@ class Niter2:
 
     def warm_up_numba_fns(self):
         """Run warmup routine to compile numba methods."""
+        print()
+        print("Niter2: compiling all numba accelerated methods.")
         lp = np.array([[1,1]],dtype=float)
         rp = np.array([[2,2]],dtype=float)
         ep = np.ones([3,3], dtype=float)
@@ -264,6 +242,8 @@ class Niter2:
         x1 = np.array([400, 300, 1], dtype=np.float32)
         x2 = np.array([420, 310, 1], dtype=np.float32)
         _triangulate_nviews(p1,p2,x1,x2)
+        print("Niter2: Numba accelerated methods ready.")
+        print()
 
     def non_iter_update(self,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
@@ -445,6 +425,66 @@ class DataSetLoader:
             cv2.imshow("Right image", right_img)
             cv2.waitKey(100)
         cv2.destroyAllWindows()
+
+class Results:
+    """Class to process results and show plots."""
+
+    def __init__(self) -> None:
+        # Initialize class variables
+        self.triangualted_pts_hs = [] # List[int]
+        self.hs_time = [] # List[float]
+        self.triangulated_pts_niter2 = [] # List[int]
+        self.niter2_time = []
+        # List[float], rmse scores between 3d points computed by two methods
+        self.rmse_scores = []
+        self.rmse_thres = 1.0 # TODO experimentally figued out
+        # List[np.ndarray, np.ndarray]
+        self.plot_3ds_mats = []
+
+    def numpy_rmse(self, arr_hs:np.ndarray, arr_niter2:np.ndarray)->float:
+        """
+        Compute RMSE using fast form function.
+
+        Based on https://stackoverflow.com/questions/21926020/how-to-calculate-rmse-using-ipython-numpy
+        arr_hs: [Kx3], collection of 3d points from one method hs
+        arr2: [Kx3], collection of 3d points from one method hs
+        rmse: [1x1] root mean squared error
+        """
+        rmse = np.linalg.norm(arr_hs - arr_niter2) / np.sqrt(len(arr_hs))
+        return rmse
+
+    def compute_points_per_sec(self, lss_pts:List[np.ndarray], 
+                               lss_time:List[float])->float:
+        """Compute points/sec metric."""
+        _total_pts = np.sum(np.asarray(lss_pts))
+        _total_time = np.sum(np.asarray(lss_time))
+        _pts_sec = _total_pts / _total_time
+        return _pts_sec
+
+    def plot_on_3d(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
+        """Plot 3D points for both methods using an isometric plot."""
+        # Configure plot
+        fig = plt.figure()
+        ax = fig.add_subplot(projection='3d')
+        # Plot hs_pts3d points
+        xs = hs_pts3d[:, 0]
+        ys = hs_pts3d[:, 1]
+        zs = hs_pts3d[:, 2]
+        ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
+        # Plot niter2_pts3d points in orange
+        xs_niter2 = niter2_pts3d[:, 0]
+        ys_niter2 = niter2_pts3d[:, 1]
+        zs_niter2 = niter2_pts3d[:, 2]
+        ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
+                marker='+')
+        # Set labels
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.legend()
+        plt.show()
+
+    #TODO method to generate final results
 
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     """Do Lowe's ratio test to return best matching keypoints."""
@@ -671,38 +711,6 @@ def show_stereo_images(left_img:np.ndarray, right_img:np.ndarray):
     cv2.imshow("right_img", right_img)
     cv2.waitKey(1)
 
-def plot_on_3d(hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
-    """Plot 3D points for both methods using an isometric plot."""
-    # Configure plot
-    fig = plt.figure()
-    ax = fig.add_subplot(projection='3d')
-
-    # Plot hs_pts3d points
-    xs = hs_pts3d[:, 0]
-    ys = hs_pts3d[:, 1]
-    zs = hs_pts3d[:, 2]
-    ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
-
-    # Plot niter2_pts3d points in orange
-    xs_niter2 = niter2_pts3d[:, 0]
-    ys_niter2 = niter2_pts3d[:, 1]
-    zs_niter2 = niter2_pts3d[:, 2]
-    ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
-               marker='+')
-
-    # Set labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    ax.legend()
-    plt.show()
-
-def compute_points_per_sec(lss_pts:List[np.ndarray], lss_time:List[float])->float:
-    """Compute points/sec metric."""
-    _total_pts = np.sum(np.asarray(lss_pts))
-    _total_time = np.sum(np.asarray(lss_time))
-    _pts_sec = _total_pts / _total_time
-    return _pts_sec
 
 def test_pipeline(dataset_name: str, feature_detector:str,
                   full_verbose:bool = False,
@@ -712,6 +720,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     pair_processed = 1
     # Triangulate with niter2
     niter2 = Niter2()
+    results = Results() # Class to store results
     dataloader = DataSetLoader(dataset_name)
     k_mat = np.copy(dataloader.calibration_matrix) # camera calibration matrix
     p_mat_left = np.zeros((3,4), dtype=float) # P1
@@ -761,8 +770,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
 
         ## Triangulate using optimal triangulation method
         hs_pts3d, t_hs = triangulate_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-        triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
-        hs_time.append(t_hs) # seconds
+        results.triangualted_pts_hs.append(hs_pts3d.shape[0])
+        results.hs_time.append(t_hs)
+        # triangualted_pts_hs.append() # int
+        # hs_time.append(t_hs) # seconds
 
         ## Triangulate using non-iterative niter2 method
         # out_pts3d, [t_optimal_update, t_triangulate]
@@ -770,8 +781,10 @@ def test_pipeline(dataset_name: str, feature_detector:str,
                                                     e_mat, s_mat, rot1,
                                                     p_mat_left, p_mat_right,
                                                     show_time_stat=True)
-        triangulated_pts_niter2.append(niter2_pts3d.shape[0]) # int
-        niter2_time.append(t_lss[0]) # seconds
+        # triangulated_pts_niter2.append(niter2_pts3d.shape[0]) # int
+        # niter2_time.append() # seconds
+        results.triangulated_pts_niter2.append(niter2_pts3d.shape[0])
+        results.niter2_time.append(t_lss[0])
 
         if full_verbose:
             print()
@@ -788,20 +801,17 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         if short_verbose:
             print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
         
-        if i == 1:
-            plot_on_3d(hs_pts3d, niter2_pts3d) # Test
-            break # Only do one image pair
+        # if i == 1:
+        #     plot_on_3d(hs_pts3d, niter2_pts3d) # Test
+        #     break # Only do one image pair
 
     # Print statistics
-    hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
-    niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
-    # TODO a separate class to store and process results
-    print()
-    print(f"points/sec by hs method: {int(hs_pts_sec)}")
-    print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
-    # TODO mean relative error
-    print()
-    # TODO this needs to be corrected, comes out all wrong
+    # hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
+    # niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
+    # print()
+    # print(f"points/sec by hs method: {int(hs_pts_sec)}")
+    # print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
+    # print()
     # TODO save that plot where agreement was best
     #plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
     #cv2.destroyAllWindows()

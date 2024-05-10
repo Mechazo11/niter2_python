@@ -41,6 +41,8 @@ Based on this [gist](https://gist.github.com/davegreenwood/e1d2227d08e24cc4e353d
 9. Record stats for point/sec
 10. Record RMSE of triangulated points
 
+11. RMSE between 3d points: https://stackoverflow.com/questions/21926020/how-to-calculate-rmse-using-ipython-numpy
+
 # Important resources for implementation
 
 1. opencv_epipolar: https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
