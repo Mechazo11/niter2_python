@@ -26,11 +26,9 @@ TODO the commands to setup enviornment
 
 * In methodology secion, in short show how the math for $x^TFx' = 0$ comes out
 
-* Also show $E = K_l^T F K_r$ equation to explain why we unable to use Essential matrix
+* Also show $E = K_l^T F K_r$ equation to explain why we unable to use Essential matrix for the NotreDam dataset
 
 * From paper, show the key steps for the non-iterative niter2 method
-
-
 
 
 ### Some methodology writing points
@@ -79,3 +77,5 @@ TODO the commands to setup enviornment
 [12] PyYML, "PyYML", URL: https://python.land/data-processing/python-yaml
 
 [13] Numba, "A ~5 minutes guide to Numba", URL: https://numba.pydata.org/numba-doc/dev/user/5minguide.html
+
+[14] Amy Tabb, "N-view triangulation: DLT method", URL: https://amytabb.com/tips/tutorials/2021/10/31/triangulation-DLT-2-3/

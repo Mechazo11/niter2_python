@@ -118,6 +118,36 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
         x_hat_prime = np.floor(x_hat_prime).astype(np.int32)
         return x_hat, x_hat_prime
 
+@jit(nopython = True, parallel = False)
+def _triangulate_nviews(p1: np.ndarray, p2: np.ndarray,
+                        x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
+    """
+    Triangulate a point visible in two camera views.
+
+    p1, p2: 3x4 projection matrices.
+    x1, x2: 3x1 homogeneous coordinates (2D points).
+
+    Based on,
+    Hartley, Richard, and Andrew Zisserman. 
+    Multiple View Geometry in Computer Vision. 2nd ed.,
+    Cambridge University Press, 2004.
+    Chapter 12.2: "Triangulation" (especially pages 312–317).
+    """
+    # Prepare the matrix for two views
+    # 3 rows per view, 4 for the projection matrix + 1 for the homogeneous coordinates
+    m_mat = np.zeros((6,5), dtype=np.float32)
+    # Fill in the matrix with data for the first view
+    m_mat[0:3, :4] = p1
+    m_mat[0:3, 4] = -x1
+    # Fill in the matrix with data for the second view
+    m_mat[3:6, :4] = p2
+    m_mat[3:6, 4] = -x2
+    # Perform SVD
+    _, _, v = np.linalg.svd(m_mat)
+    x_3d = v[-1, :4]
+    # Return homogeneous 3D coordinate
+    return x_3d / x_3d[3]
+
 def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -177,37 +207,6 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
 #         x_3d = v[-1, :4]
 #         return x_3d / x_3d[3] # 4D coordinate
 
-@jit(nopython = True, parallel = False)
-def _triangulate_nviews(p1: np.ndarray, p2: np.ndarray,
-                        x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
-    """
-    Triangulate a point visible in two camera views.
-
-    p1, p2: 3x4 projection matrices.
-    x1, x2: 3x1 homogeneous coordinates (2D points).
-
-    Based on,
-    Hartley, Richard, and Andrew Zisserman. 
-    Multiple View Geometry in Computer Vision. 2nd ed.,
-    Cambridge University Press, 2004.
-    Chapter 12.2: "Triangulation" (especially pages 312–317).
-    """
-    # Prepare the matrix for two views
-    # 3 rows per view, 4 for the projection matrix + 1 for the homogeneous coordinates
-    m_mat = np.zeros((6,5), dtype=np.float32)
-    # Fill in the matrix with data for the first view
-    m_mat[0:3, :4] = p1
-    m_mat[0:3, 4] = -x1
-    # Fill in the matrix with data for the second view
-    m_mat[3:6, :4] = p2
-    m_mat[3:6, 4] = -x2
-    # Perform SVD
-    _, _, v = np.linalg.svd(m_mat)
-    x_3d = v[-1, :4]
-    # Return homogeneous 3D coordinate
-    return x_3d / x_3d[3]
-
-
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
@@ -266,7 +265,6 @@ class Niter2:
         x2 = np.array([420, 310, 1], dtype=np.float32)
         _triangulate_nviews(p1,p2,x1,x2)
 
-
     def non_iter_update(self,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -284,13 +282,12 @@ class Niter2:
 
         return x_hat, x_hat_prime
 
-    def triangulate(self, left_pts:np.ndarray, right_pts:np.ndarray,
+    def triangulate_niter2(self, left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray,
                            rot:np.ndarray, p_left:np.ndarray,
                            p_right:np.ndarray,
-                           show_time_stat:bool = False)->np.ndarray:
+                           show_time_stat:bool = False)->Tuple[np.ndarray, List]:
         """
-
         Perform triangulation using niter2 algorithm for all 3D points.
 
         Output: x_mat: [Kx3], 3D triangulated points
@@ -317,23 +314,22 @@ class Niter2:
         left_pts_updated, right_pts_updated = self.non_iter_update(np.copy(left_pts),
                                                                    np.copy(right_pts),
                                                                    e_mat, s_mat)
-        t_iter_up = curr_time() - t00
-        
+        t01 = curr_time()
+        t_optimal_pts = (t01 - t00)/1000
         # In homogeneous coordinates converted to floats
         left_pts_updated = left_pts_updated.astype(float)
         left_pts_updated = right_pts_updated.astype(float)
-
         # Use DLT to triangulate 3D points
-        t00 = curr_time()
-        out_pts3d = self.two_view_triangulate(left_pts_updated,right_pts_updated,
-                                              p_left, p_right) # [Kx3]
-        t_triangulate = curr_time() - t00
-
+        t11 = curr_time()
+        out_pts3d = self.two_view_linear_triangulate(left_pts_updated,
+                                                     right_pts_updated,
+                                                     p_left, p_right) # [Kx3]
+        t12 = curr_time()
+        t_triangulate = (t12 - t11)/1000 # seconds
         if show_time_stat:
-            print(f"non_iter_update: {t_iter_up} ms")
-            print(f"triangulation: {t_triangulate} ms")
-
-        return out_pts3d
+            print(f"non_iter_update: {t01 - t00} ms")
+            print(f"triangulation: {t12 - t11} ms")
+        return out_pts3d, [t_optimal_pts, t_triangulate]
 
     def triangulate_nviews(self,p_lss:List[np.ndarray],
                            ip_lss:List[np.ndarray])->np.ndarray:
@@ -350,13 +346,16 @@ class Niter2:
 
         return x_3d / x_3d[3]
 
-    def two_view_triangulate(self, x1:np.ndarray, x2:np.ndarray,
+    def two_view_linear_triangulate(self, x1:np.ndarray, x2:np.ndarray,
                         p1:np.ndarray, p2:np.ndarray)->np.ndarray:
         """
         Perform two-view triangulation.
 
-        x1,x2: [Kx3] homog. coordinates.
-        p1, p2: projection matrices
+        Solve A.P = 0 problem using linear triangulation as described in
+        Chapter 12.2 in Hartley and Zisserman, Multi View Geometry
+
+        x1,x2: [Kx3] 2D matches in hom. coordinates.
+        p1, p2: [3x4] projection matrices
         """
         if not len(x2) == len(x1):
             err_msg = "Number of points don't match."
@@ -641,25 +640,29 @@ def generate_projection_matrix(k_mat:np.ndarray, rot:np.ndarray,
     # print(f"proj_mat: {p_mat}")
     return p_mat
 
-def triangualte_hs(pts1:np.ndarray, pts2:np.ndarray, 
-                   proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
+def triangulate_hs(pts1:np.ndarray, pts2:np.ndarray,
+                   proj1:np.ndarray, proj2:np.ndarray)->Tuple[np.ndarray, float]:
     """
     Triangulate 2D keypoints in world coordinate using hs method.
 
     Uses Hartley and Zisserman's optimal triangulation method
-    _1, _2: left and right camera
+    This version is heavily optimized and will run close to native C++ speed
     pts1, pts2: 2D matched keypoints [Kx2]
     proj1, proj2: projection matrices of left and right camera respectively, [3x4]
     Call opencv's triangulatePoints()
     https://docs.opencv.org/4.x/d0/dbd/group__triangulation.html
     """
+    # Initialize
     hs_pts3d = np.zeros(0, dtype=float)
     hs_pts4d_hom = np.zeros(0, dtype=float)
+    t1 = 0.0
+    t00 = curr_time()
     hs_pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
     ##Convert 4d homogeneous coordinates to 3d coordinate
+    t1 = (curr_time() - t00)/1000 # second
     hs_pts4d_hom = hs_pts4d_hom / np.tile(hs_pts4d_hom[-1, :], (4, 1))
     hs_pts3d = hs_pts4d_hom[:3, :].T # [Nx3], [x,y,z]
-    return hs_pts3d
+    return hs_pts3d, t1
 
 def show_stereo_images(left_img:np.ndarray, right_img:np.ndarray):
     """Call imshow() to show left right image pairs."""
@@ -757,31 +760,28 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
 
         ## Triangulate using optimal triangulation method
-        t0 = curr_time()
-
-        hs_pts3d = triangualte_hs(left_pts, right_pts, p_mat_left, p_mat_right)
-
-        t_hs = (curr_time() - t0)/1000 # seconds
-        hs_time.append(t_hs) # seconds
+        hs_pts3d, t_hs = triangulate_hs(left_pts, right_pts, p_mat_left, p_mat_right)
         triangualted_pts_hs.append(hs_pts3d.shape[0]) # int
+        hs_time.append(t_hs) # seconds
 
         ## Triangulate using non-iterative niter2 method
-        t1 = curr_time()
-
-        niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
-                                         p_mat_left, p_mat_right,
-                                         show_time_stat=True)
-
-        triangulated_pts_niter2.append(niter2_pts3d.shape[0])
-        t_niter2 = (curr_time() - t1)/1000 # seconds
-        niter2_time.append(t_niter2) # seconds
+        # out_pts3d, [t_optimal_update, t_triangulate]
+        niter2_pts3d,t_lss = niter2.triangulate_niter2(left_pts, right_pts,
+                                                    e_mat, s_mat, rot1,
+                                                    p_mat_left, p_mat_right,
+                                                    show_time_stat=True)
+        triangulated_pts_niter2.append(niter2_pts3d.shape[0]) # int
+        niter2_time.append(t_lss[0]) # seconds
 
         if full_verbose:
-            #print(f"Processed image pair: {pair_processed}")
+            print()
+            print(f"Processed image pair: {pair_processed}")
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
             print(f"niter2: triangulated points: {niter2_pts3d.shape[0]}")
             print(f"t_hs: {t_hs} s")
-            print(f"t_niter2: {t_niter2} s")
+            print(f"t_niter2 optimal points: {t_lss[0]} s")
+            print(f"t_niter2 DLT triangulation: {t_lss[1]} s")
+            print()
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right) # Update for next round
         # short verbose message
