@@ -33,6 +33,12 @@ def curr_time():
     """Return the time tick in milliseconds."""
     return time.monotonic() * 1000
 
+def debug_lock():
+    """Locks system in an infinite loop for debugging."""
+    print("LOCK")
+    while (1):
+        pass
+
 @jit(nopython = True, parallel = False)
 def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
@@ -147,6 +153,59 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
 
+#@jit(nopython = True, parallel = False)
+# def _triangulate_nviews(p_lss:List[np.ndarray],ip_lss:List[np.ndarray])->np.ndarray:
+#         """
+#         Triangulate a point visible in n camera views.
+
+#         Numba accelerated
+
+#         p_lss is a list of camera projection matrices.
+#         ip_lss is a list of homogenised image points. eg [ [x, y, 1], [x, y, 1] ], OR,
+#         ip_lss is a 2d array - shape nx3 - [ [x, y, 1], [x, y, 1] ]
+#         len of ip must be the same as len of P
+#         """
+#         # if not len(ip_lss) == len(p_lss):
+#         #     err_msg = "Number of points and number of cameras not equal."
+#         #     raise ValueError(err_msg)
+#         n = len(p_lss)
+#         m_mat = np.zeros([3*n, 4+n])
+#         for i, (x, p) in enumerate(zip(ip_lss, p_lss)):
+#             m_mat[3*i:3*i+3, :4] = p
+#             m_mat[3*i:3*i+3, 4+i] = -x
+#         v = np.linalg.svd(m_mat)[-1]
+#         x_3d = v[-1, :4]
+#         return x_3d / x_3d[3] # 4D coordinate
+
+@jit(nopython = True, parallel = False)
+def _triangulate_nviews(p1: np.ndarray, p2: np.ndarray,
+                        x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
+    """
+    Triangulate a point visible in two camera views.
+
+    p1, p2: 3x4 projection matrices.
+    x1, x2: 3x1 homogeneous coordinates (2D points).
+
+    Based on,
+    Hartley, Richard, and Andrew Zisserman. 
+    Multiple View Geometry in Computer Vision. 2nd ed.,
+    Cambridge University Press, 2004.
+    Chapter 12.2: "Triangulation" (especially pages 312–317).
+    """
+    # Prepare the matrix for two views
+    # 3 rows per view, 4 for the projection matrix + 1 for the homogeneous coordinates
+    m_mat = np.zeros((6,5), dtype=np.float32)
+    # Fill in the matrix with data for the first view
+    m_mat[0:3, :4] = p1
+    m_mat[0:3, 4] = -x1
+    # Fill in the matrix with data for the second view
+    m_mat[3:6, :4] = p2
+    m_mat[3:6, 4] = -x2
+    # Perform SVD
+    _, _, v = np.linalg.svd(m_mat)
+    x_3d = v[-1, :4]
+    # Return homogeneous 3D coordinate
+    return x_3d / x_3d[3]
 
 
 class Niter2:
@@ -199,6 +258,14 @@ class Niter2:
         ep = np.ones([3,3], dtype=float)
         sp = self.s_mat
         _non_iter_update(self.algorithm, lp, rp, ep,sp)
+        p1 = np.array([[500, 0, 320, 0], [0, 500, 240, 0], [0, 0, 1, 0]],
+                      dtype=np.float32)
+        p2 = np.array([[500, 0, 320, -100], [0, 500, 240, 0], [0, 0, 1, 0]],
+                      dtype=np.float32)
+        x1 = np.array([400, 300, 1], dtype=np.float32)
+        x2 = np.array([420, 310, 1], dtype=np.float32)
+        _triangulate_nviews(p1,p2,x1,x2)
+
 
     def non_iter_update(self,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
@@ -255,27 +322,17 @@ class Niter2:
         # In homogeneous coordinates converted to floats
         left_pts_updated = left_pts_updated.astype(float)
         left_pts_updated = right_pts_updated.astype(float)
-        
-        # TODO delete this and replace with DLT, will work with 3D homogeneous points
-        
-        
 
-        # Call OpenCV triangulate to find 3D points
-        
+        # Use DLT to triangulate 3D points
         t00 = curr_time()
-        # # covnert to 2D coordinate
-        # left_pts_nit = left_pts_updated[:, :2]
-        # right_pts_nit = right_pts_updated[:, :2]
-        # out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, 
-        #                                     p_left, p_right)\
         out_pts3d = self.two_view_triangulate(left_pts_updated,right_pts_updated,
-                                              p_left, p_right)
+                                              p_left, p_right) # [Kx3]
         t_triangulate = curr_time() - t00
-        
+
         if show_time_stat:
             print(f"non_iter_update: {t_iter_up} ms")
             print(f"triangulation: {t_triangulate} ms")
-        
+
         return out_pts3d
 
     def triangulate_nviews(self,p_lss:List[np.ndarray],
@@ -289,16 +346,8 @@ class Niter2:
         len of ip must be the same as len of P
         TODO this method may need acceleration
         """
-        # if not len(ip_lss) == len(p_lss):
-        #     err_msg = "Number of points and number of cameras not equal."
-        #     raise ValueError(err_msg)
-        n = len(p_lss)
-        m_mat = np.zeros([3*n, 4+n])
-        for i, (x, p) in enumerate(zip(ip_lss, p_lss)):
-            m_mat[3*i:3*i+3, :4] = p
-            m_mat[3*i:3*i+3, 4+i] = -x
-        v = np.linalg.svd(m_mat)[-1]
-        x_3d = v[-1, :4]
+        x_3d = _triangulate_nviews(p_lss[0], p_lss[1], ip_lss[0], ip_lss[1])
+
         return x_3d / x_3d[3]
 
     def two_view_triangulate(self, x1:np.ndarray, x2:np.ndarray,
@@ -306,26 +355,21 @@ class Niter2:
         """
         Perform two-view triangulation.
 
-        x1,x2: (Kx3 homog. coordinates).
+        x1,x2: [Kx3] homog. coordinates.
         p1, p2: projection matrices
         """
         if not len(x2) == len(x1):
             err_msg = "Number of points don't match."
             raise ValueError(err_msg)
-        x_3d = [self.triangulate_nviews([p1, p2], [x[0], x[1]]) for x in zip(x1, x2)]
-        return np.array(x_3d)
+        # x_3d = [self.triangulate_nviews([p1, p2], [x[0], x[1]]) for x in zip(x1, x2)]
 
-    # TODO depreciate once DLT method is tested to work correctly
-    def opencv_triangulate(self, pts1:np.ndarray, pts2:np.ndarray, 
-                    proj1:np.ndarray, proj2:np.ndarray)->np.ndarray:
-        """Call OpenCV triangulate method to use updated keypoints."""
-        # _pts3d = np.zeros((0,3), dtype=float)
-        # _pts4d_hom = np.zeros((0,4), dtype=float)
-        _pts4d_hom = cv2.triangulatePoints(proj1, proj2, pts1.T, pts2.T)
-        ##Convert 4d homogeneous coordinates to 3d coordinate
-        _pts4d_hom = _pts4d_hom / np.tile(_pts4d_hom[-1, :], (4, 1))
-        _pts3d = _pts4d_hom[:3, :].T # [Nx3], [x,y,z]
-        return _pts3d
+        x_3d = []
+        for i in range(x1.shape[0]):
+            point_3d = self.triangulate_nviews([p1, p2], [x1[i], x2[i]])
+            x_3d.append(point_3d)
+        x_3d = np.array(x_3d) # [Kx4]
+        x_3d = x_3d[:,0:3] # Drop the last column
+        return x_3d
 
 class DataSetLoader:
     """
@@ -732,8 +776,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         t_niter2 = (curr_time() - t1)/1000 # seconds
         niter2_time.append(t_niter2) # seconds
 
-        if i == 15:
-            plot_on_3d(hs_pts3d, niter2_pts3d) # Test
+        plot_on_3d(hs_pts3d, niter2_pts3d) # Test
 
         if full_verbose:
             #print(f"Processed image pair: {pair_processed}")
@@ -746,7 +789,9 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         # short verbose message
         if short_verbose:
             print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
-        # break # Only do one image pair
+        
+        if i == 5:
+            break # Only do one image pair
 
     # Print statistics
     hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
