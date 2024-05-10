@@ -80,9 +80,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             x_prime = np.append(right_pts[i], 1)  # [1x3]
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
-            
-            #print(f"n: {n.shape}, n_prime: {n_prime.shape}")
-            print(f"n: {n}, n_prime: {n_prime}")
 
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
             b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
@@ -92,6 +89,9 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             lambda_ = c / (b + d) # lambda_ = c / (b+d)
             del_x = lambda_ * n # [1x3]
             del_x_prime = lambda_ * n_prime #[1x3]
+            
+            print(f"a: {a}, b: {b}, c: {c}, d: {d}, lambda: {lambda_}, del_x: {del_x}, del_x': {del_x_prime}")
+            
             n = n - np.dot(e_tildae,del_x_prime) # n = n-E_tildae.delta_x'
             n_prime = n_prime - np.dot(e_tildae.T, del_x) # n' = n'-(E_tildae.T).delta_x
             if np.array_equal(algorithm, np.array([[2]], dtype=np.int8)):
@@ -130,19 +130,33 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     """Vectorized version of _non_iter_update()."""
     
     """
-        * Make pts from 2D to 3D homogeneized
+        * Make pts from 2D to 3D homogenized
     """
     
-    arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1)
+    e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T) # [2x2]
+    arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1) # [Kx1]
     x_mat = np.hstack((left_pts, arr_add)) # [Kx3]
     x_mat_prime = np.hstack((right_pts, arr_add)) # [Kx3]
     # Find directions
-    n_mat = np.dot(x_mat_prime,np.dot(s_mat, e_mat).T)
-    n_mat_prime = np.dot(x_mat,np.dot(s_mat, e_mat.T).T)
-    print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
-    print(n_mat[:5])
-    print()
-    print(n_mat_prime[:5])
+    n_mat = np.dot(x_mat_prime,np.dot(s_mat, e_mat).T) # [Kx2]
+    n_mat_prime = np.dot(x_mat,np.dot(s_mat, e_mat.T).T) # [Kx2]
+    # Compute a,b,c,d
+    a = np.dot(np.dot(n_mat, e_tildae),n_mat_prime.T)
+    b = 0.5 * (np.dot(n_mat, n_mat.T) + np.dot(n_mat_prime, n_mat_prime.T))
+    c = np.dot(np.dot(x_mat, e_mat), x_mat_prime.T)
+    d = np.sqrt(b**2 - a @ c)
+    #print(f"a shape: {a.shape}, b shape: {b.shape}, c shape {c.shape}, d shape: {d.shape}")
+    # lambda
+    lambda_mat = c / (b + d)
+    
+    # compute delta_x and delta_x_prime
+    delta_x = np.dot(lambda_mat, n_mat)
+    delta_x_prime = np.dot(lambda_mat, n_mat_prime)
+    print(f"lambda_mat shape: {lambda_mat.shape}, del_x: {delta_x.shape}")
+    print(delta_x)
+    print(delta_x_prime)
+    #print(a[:5])
+
 
 
 class Niter2:
