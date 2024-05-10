@@ -431,8 +431,10 @@ class Results:
 
     def __init__(self) -> None:
         # Initialize class variables
+        self.pts_3d_hs_lss = [] # List[np.ndarray]
         self.triangualted_pts_hs = [] # List[int]
         self.hs_time = [] # List[float]
+        self.pts_3d_niter2_lss = [] # List[np.ndarray]
         self.triangulated_pts_niter2 = [] # List[int]
         self.niter2_time = []
         self.pair_processed = 0 # int
@@ -453,6 +455,14 @@ class Results:
         """
         rmse = np.linalg.norm(arr_hs - arr_niter2) / np.sqrt(len(arr_hs))
         return rmse
+
+    def compute_rmse(self):
+        """Compute RMSE for all pairs of 3d points to find average rmse."""
+        for i in range(len(self.pts_3d_hs_lss)):
+            hs_pts3d = self.pts_3d_hs_lss[i]
+            niter2_pts3d = self.pts_3d_niter2_lss[i]
+            print()
+            pass
 
     def compute_points_per_sec(self, lss_pts:List[np.ndarray], 
                                lss_time:List[float])->float:
@@ -779,6 +789,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
         ## Triangulate using optimal triangulation method
         hs_pts3d, t_hs = triangulate_hs(left_pts, right_pts, p_mat_left, p_mat_right)
+        results.pts_3d_hs_lss.append(hs_pts3d)
         results.triangualted_pts_hs.append(hs_pts3d.shape[0])
         results.hs_time.append(t_hs)
         # triangualted_pts_hs.append() # int
@@ -789,8 +800,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
                                                     e_mat, s_mat, rot1,
                                                     p_mat_left, p_mat_right,
                                                     show_time_stat=False)
-        # triangulated_pts_niter2.append(niter2_pts3d.shape[0]) # int
-        # niter2_time.append() # seconds
+        results.pts_3d_niter2_lss.append(niter2_pts3d)
         results.triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         results.niter2_time.append(t_lss[0])
         if full_verbose:
