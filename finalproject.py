@@ -435,6 +435,7 @@ class Results:
         self.hs_time = [] # List[float]
         self.triangulated_pts_niter2 = [] # List[int]
         self.niter2_time = []
+        self.pair_processed = 0 # int
         # List[float], rmse scores between 3d points computed by two methods
         self.rmse_scores = []
         self.rmse_thres = 1.0 # TODO experimentally figued out
@@ -484,7 +485,24 @@ class Results:
         ax.legend()
         plt.show()
 
-    #TODO method to generate final results
+    def generate_result(self):
+        """
+        Generate statistics from the experiment.
+
+        TODO
+        """
+        # Print statistics
+        hs_pts_sec = self.compute_points_per_sec(self.triangualted_pts_hs, 
+                                                 self.hs_time)
+        niter_pts_sec = self.compute_points_per_sec(self.triangulated_pts_niter2, 
+                                                    self.niter2_time)
+        # call method to compute the average rmse
+        print()
+        print(f"HS method: {int(hs_pts_sec/ 1000)}K points/sec")
+        print(f"Niter2 method: {int(niter_pts_sec/1000)}K points/sec")
+        print()
+        # TODO show average relative position error
+        # TODO show best 3d plot
 
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     """Do Lowe's ratio test to return best matching keypoints."""
@@ -711,13 +729,12 @@ def show_stereo_images(left_img:np.ndarray, right_img:np.ndarray):
     cv2.imshow("right_img", right_img)
     cv2.waitKey(1)
 
-
-def test_pipeline(dataset_name: str, feature_detector:str,
+def perform_experiment(dataset_name: str, feature_detector:str,
                   full_verbose:bool = False,
                   short_verbose:bool = False)->None:
     """Perform full experiment."""
     # Intialize variables
-    pair_processed = 1
+    pairs_processed = 1
     # Triangulate with niter2
     niter2 = Niter2()
     results = Results() # Class to store results
@@ -725,11 +742,6 @@ def test_pipeline(dataset_name: str, feature_detector:str,
     k_mat = np.copy(dataloader.calibration_matrix) # camera calibration matrix
     p_mat_left = np.zeros((3,4), dtype=float) # P1
     p_mat_left[0:3, 0:3] = np.eye(3, dtype=float)
-    # Result variables
-    triangualted_pts_hs = [] # List[int]
-    hs_time = [] # List[float]
-    triangulated_pts_niter2 = [] # List[int]
-    niter2_time = []
 
     # Cycle through pairwise images
     # TODO add start_idx to be read from dataset.yaml file
@@ -755,63 +767,46 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
         right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
         #show_stereo_images(left_img, right_img) # DEBUG
-
         left_pts, right_pts = detect_features_and_track(feature_detector,left_img,
                                                       right_img)
         f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
         e_mat = compute_essential_matrix(f_mat, k_mat)
         rot1, _, tvec = cv2.decomposeEssentialMat(e_mat)
-
         # If not converted to float32, cv2.triangulate points crashes kernel
         # All points [Nx2] here
         left_pts = left_pts.astype(np.float32)
         right_pts = right_pts.astype(np.float32)
         p_mat_right = generate_projection_matrix(k_mat, rot1, tvec) # outputs P2
-
         ## Triangulate using optimal triangulation method
         hs_pts3d, t_hs = triangulate_hs(left_pts, right_pts, p_mat_left, p_mat_right)
         results.triangualted_pts_hs.append(hs_pts3d.shape[0])
         results.hs_time.append(t_hs)
         # triangualted_pts_hs.append() # int
         # hs_time.append(t_hs) # seconds
-
         ## Triangulate using non-iterative niter2 method
         # out_pts3d, [t_optimal_update, t_triangulate]
         niter2_pts3d,t_lss = niter2.triangulate_niter2(left_pts, right_pts,
                                                     e_mat, s_mat, rot1,
                                                     p_mat_left, p_mat_right,
-                                                    show_time_stat=True)
+                                                    show_time_stat=False)
         # triangulated_pts_niter2.append(niter2_pts3d.shape[0]) # int
         # niter2_time.append() # seconds
         results.triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         results.niter2_time.append(t_lss[0])
-
         if full_verbose:
             print()
-            print(f"Processed image pair: {pair_processed}")
+            print(f"Processed image pair: {pairs_processed}")
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
             print(f"niter2: triangulated points: {niter2_pts3d.shape[0]}")
             print(f"t_hs: {t_hs} s")
             print(f"t_niter2 optimal points: {t_lss[0]} s")
             print(f"t_niter2 DLT triangulation: {t_lss[1]} s")
             print()
-        pair_processed+=1
+        pairs_processed+=1
         p_mat_left = np.copy(p_mat_right) # Update for next round
         # short verbose message
         if short_verbose:
-            print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
-        
-        # if i == 1:
-        #     plot_on_3d(hs_pts3d, niter2_pts3d) # Test
-        #     break # Only do one image pair
-
-    # Print statistics
-    # hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
-    # niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
-    # print()
-    # print(f"points/sec by hs method: {int(hs_pts_sec)}")
-    # print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
-    # print()
-    # TODO save that plot where agreement was best
-    #plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
-    #cv2.destroyAllWindows()
+            print(f"Image pair: {pairs_processed} contains {left_pts.shape[0]} kp pts.")
+        # end of loop
+    results.pair_processed = pairs_processed
+    return results
