@@ -37,9 +37,8 @@ def curr_time():
 def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
+        """Perform non-iterative update as shown in Section 5."""
         """
-        Perform non-iterative update as shown in Section 5.
-
         Algorithm is shown in Listing 3 in the paper
 
         Args:
@@ -78,12 +77,8 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             # Initialize variables for these keypoints pairs
             x = np.append(left_pts[i], 1)  # [1x3]
             x_prime = np.append(right_pts[i], 1)  # [1x3]
-            
-            print(f"x: {x}, x_prime: {x_prime}")
-            
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
-
             a = np.dot(np.dot(n.T, e_tildae),n_prime) # a = (n.T).E_tildae.n'
             b_rhs = (np.dot(n.T,n) + np.dot(n_prime.T, n_prime)) # L_2(n,n') norm
             b = 0.5 * b_rhs # b = 0.5*((n.T).n + (n'.T).n')  # noqa: E501
@@ -101,22 +96,21 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
                 del_x_prime = lambda_ * n_prime #[1x3]
             else:
                 # niter1
+                # FUTURE WORK
                 pass
             # Corrected points <x_hat, x_hat_prime> in homogeneous coord
             x = x - np.dot(s_mat.T, del_x) # x_hat
             x_prime = x_prime - np.dot(s_mat.T, del_x_prime) # x_hat_prime
-
             # Reshape to correct dimension, [1x3] from [3]
             x = np.reshape(x, (-1,3))
             x_prime = np.reshape(x_prime, (-1,3))
             # Push to matrix
             x_hat = np.vstack((x_hat, x))
             x_hat_prime = np.vstack((x_hat_prime, x_prime))
-            #DEBUG
 
         # Breaks with Numba
-        x_hat = np.floor(x_hat).astype(np.int16)
-        x_hat_prime = np.floor(x_hat_prime).astype(np.int16)
+        x_hat = np.floor(x_hat).astype(np.int32)
+        x_hat_prime = np.floor(x_hat_prime).astype(np.int32)
         return x_hat, x_hat_prime
 
 def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
@@ -193,9 +187,9 @@ class Niter2:
         else:
             self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
         self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
-        # print("running warmup....")
-        # self.warm_up_numba_fns()
-        # print("warmup complete")
+        print("running warmup....")
+        self.warm_up_numba_fns()
+        print("warmup complete")
 
     def warm_up_numba_fns(self):
         """Run warmup routine to compile numba methods."""
