@@ -145,16 +145,15 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     b = 0.5 * (np.dot(n_mat, n_mat.T) + np.dot(n_mat_prime, n_mat_prime.T))
     c = np.dot(np.dot(x_mat, e_mat), x_mat_prime.T)
     d = np.sqrt(b**2 - a @ c)
-    #print(f"a shape: {a.shape}, b shape: {b.shape}, c shape {c.shape}, d shape: {d.shape}")
     # lambda
     lambda_mat = c / (b + d)
-    
     # compute delta_x and delta_x_prime
     delta_x = np.dot(lambda_mat, n_mat)
     delta_x_prime = np.dot(lambda_mat, n_mat_prime)
-    print(f"lambda_mat shape: {lambda_mat.shape}, del_x: {delta_x.shape}")
-    print(delta_x)
-    print(delta_x_prime)
+    n_mat = n_mat - np.dot(e_tildae, delta_x_prime.T).T
+    n_mat_prime = n_mat_prime - np.dot(e_tildae.T, delta_x.T).T
+    print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
+    #print(f"a shape: {a.shape}, b shape: {b.shape}, c shape {c.shape}, d shape: {d.shape}")
     #print(a[:5])
 
 
