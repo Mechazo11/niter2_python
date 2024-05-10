@@ -222,9 +222,7 @@ class Niter2:
         else:
             self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
         self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
-        print("running warmup....")
         self.warm_up_numba_fns()
-        print("warmup complete")
 
     def warm_up_numba_fns(self):
         """Run warmup routine to compile numba methods."""
@@ -441,8 +439,10 @@ class Results:
         # List[float], rmse scores between 3d points computed by two methods
         self.rmse_scores = []
         self.rmse_thres = 1.0 # TODO experimentally figued out
+        self.rmse_hthres = 1000 # RMSE value beyond this means very poor tracking
+        self.rmse_avg = 0.0 # Average of all RMSE values
         # List[np.ndarray, np.ndarray]
-        self.plot_3ds_mats = []
+        self.to_plot = [] # List[List[float, np.ndarray, np.ndarray],....]
 
     def numpy_rmse(self, arr_hs:np.ndarray, arr_niter2:np.ndarray)->float:
         """
@@ -456,15 +456,21 @@ class Results:
         rmse = np.linalg.norm(arr_hs - arr_niter2) / np.sqrt(len(arr_hs))
         return rmse
 
-    def compute_rmse(self):
+    def compute_rmse_get_best_points(self):
         """Compute RMSE for all pairs of 3d points to find average rmse."""
         for i in range(len(self.pts_3d_hs_lss)):
             hs_pts3d = self.pts_3d_hs_lss[i]
             niter2_pts3d = self.pts_3d_niter2_lss[i]
-            print()
-            pass
+            rmse_val = self.numpy_rmse(hs_pts3d, niter2_pts3d)
+            if np.isnan(rmse_val) or np.isinf(rmse_val) or rmse_val > self.rmse_hthres:
+                pass
+            else:
+                if rmse_val <= self.rmse_thres:
+                    self.to_plot.append([rmse_val, hs_pts3d, niter2_pts3d])
+        print(f"Number of good matches: {len(self.to_plot)}")
+        # Sort them based on the smallest to progressively largest error
 
-    def compute_points_per_sec(self, lss_pts:List[np.ndarray], 
+    def compute_points_per_sec(self, lss_pts:List[np.ndarray],
                                lss_time:List[float])->float:
         """Compute points/sec metric."""
         _total_pts = np.sum(np.asarray(lss_pts))
@@ -472,8 +478,8 @@ class Results:
         _pts_sec = _total_pts / _total_time
         return _pts_sec
 
-    def plot_on_3d(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
-        """Plot 3D points for both methods using an isometric plot."""
+    def generate_plots(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
+        """Plot 1x3 subplots showing the best three cases."""
         # Configure plot
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
@@ -495,24 +501,39 @@ class Results:
         ax.legend()
         plt.show()
 
-    def generate_result(self):
-        """
-        Generate statistics from the experiment.
+    # def generate_plots(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
+    #     """Plot 1x3 subplots showing the best three cases."""
+    #     # Configure plot
+    #     fig = plt.figure()
+    #     ax = fig.add_subplot(projection='3d')
+    #     # Plot hs_pts3d points
+    #     xs = hs_pts3d[:, 0]
+    #     ys = hs_pts3d[:, 1]
+    #     zs = hs_pts3d[:, 2]
+    #     ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
+    #     # Plot niter2_pts3d points in orange
+    #     xs_niter2 = niter2_pts3d[:, 0]
+    #     ys_niter2 = niter2_pts3d[:, 1]
+    #     zs_niter2 = niter2_pts3d[:, 2]
+    #     ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
+    #             marker='+')
+    #     # Set labels
+    #     ax.set_xlabel('X')
+    #     ax.set_ylabel('Y')
+    #     ax.set_zlabel('Z')
+    #     ax.legend()
+    #     plt.show()
 
-        TODO
-        """
-        # Print statistics
-        hs_pts_sec = self.compute_points_per_sec(self.triangualted_pts_hs, 
+    def generate_points_sec(self):
+        """Print points/sec stats from the experiment."""
+        hs_pts_sec = self.compute_points_per_sec(self.triangualted_pts_hs,
                                                  self.hs_time)
-        niter_pts_sec = self.compute_points_per_sec(self.triangulated_pts_niter2, 
+        niter_pts_sec = self.compute_points_per_sec(self.triangulated_pts_niter2,
                                                     self.niter2_time)
-        # call method to compute the average rmse
         print()
         print(f"HS method: {int(hs_pts_sec/ 1000)}K points/sec")
         print(f"Niter2 method: {int(niter_pts_sec/1000)}K points/sec")
         print()
-        # TODO show average relative position error
-        # TODO show best 3d plot
 
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
     """Do Lowe's ratio test to return best matching keypoints."""
