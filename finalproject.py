@@ -78,6 +78,9 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             # Initialize variables for these keypoints pairs
             x = np.append(left_pts[i], 1)  # [1x3]
             x_prime = np.append(right_pts[i], 1)  # [1x3]
+            
+            print(f"x: {x}, x_prime: {x_prime}")
+            
             n = np.dot(np.dot(s_mat, e_mat),x_prime) # n = S.E.x'
             n_prime = np.dot(np.dot(s_mat, e_mat.T),x) # n'= S.(E.T).x
 
@@ -89,9 +92,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             lambda_ = c / (b + d) # lambda_ = c / (b+d)
             del_x = lambda_ * n # [1x3]
             del_x_prime = lambda_ * n_prime #[1x3]
-            
-            print(f"a: {a}, b: {b}, c: {c}, d: {d}, lambda: {lambda_}, del_x: {del_x}, del_x': {del_x_prime}")
-            
             n = n - np.dot(e_tildae,del_x_prime) # n = n-E_tildae.delta_x'
             n_prime = n_prime - np.dot(e_tildae.T, del_x) # n' = n'-(E_tildae.T).delta_x
             if np.array_equal(algorithm, np.array([[2]], dtype=np.int8)):
@@ -109,7 +109,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             # Reshape to correct dimension, [1x3] from [3]
             x = np.reshape(x, (-1,3))
             x_prime = np.reshape(x_prime, (-1,3))
-
             # Push to matrix
             x_hat = np.vstack((x_hat, x))
             x_hat_prime = np.vstack((x_hat_prime, x_prime))
@@ -117,6 +116,9 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
 
             idx+=1
             if (idx>4):
+                print(x_hat)
+                print()
+                print(x_hat_prime)
                 break
 
         # Breaks with Numba
@@ -130,13 +132,16 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     """Vectorized version of _non_iter_update()."""
     
     """
-        * Make pts from 2D to 3D homogenized
+        *TODO if this works, put the correct dimensions to the right of each lines
     """
     
     e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T) # [2x2]
     arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1) # [Kx1]
     x_mat = np.hstack((left_pts, arr_add)) # [Kx3]
     x_mat_prime = np.hstack((right_pts, arr_add)) # [Kx3]
+    print()
+    print(x_mat)
+    print(x_mat_prime)
     # Find directions
     n_mat = np.dot(x_mat_prime,np.dot(s_mat, e_mat).T) # [Kx2]
     n_mat_prime = np.dot(x_mat,np.dot(s_mat, e_mat.T).T) # [Kx2]
@@ -152,9 +157,19 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     delta_x_prime = np.dot(lambda_mat, n_mat_prime)
     n_mat = n_mat - np.dot(e_tildae, delta_x_prime.T).T
     n_mat_prime = n_mat_prime - np.dot(e_tildae.T, delta_x.T).T
-    print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
+    # Update step size
+    lambda_mat = lambda_mat * (d/b)
+    delta_x = np.dot(lambda_mat, n_mat)
+    delta_x_prime = np.dot(lambda_mat, n_mat_prime)
+    # Corrected x_mat and x_mat_prime
+    x_mat = x_mat - np.dot(s_mat.T, delta_x.T).T # [Kx3] - [Kx3]
+    x_mat_prime = x_mat_prime - np.dot(s_mat.T, delta_x_prime.T).T # [Kx3] - [Kx3]
+    
+    #print(f"n_mat shape: {n_mat.shape}, n_mat_prime shape: {n_mat_prime.shape}")
     #print(f"a shape: {a.shape}, b shape: {b.shape}, c shape {c.shape}, d shape: {d.shape}")
-    #print(a[:5])
+    print()
+    print(x_mat)
+    print(x_mat_prime)
 
 
 
@@ -205,9 +220,9 @@ class Niter2:
         else:
             self.algorithm = np.array([[2]], dtype=np.int8) # 2 --> niter2, default
         self.s_mat = np.array([[1,0,0], [0,1,0]], dtype=float) # from Eqn 4
-        print("running warmup....")
-        self.warm_up_numba_fns()
-        print("warmup complete")
+        # print("running warmup....")
+        # self.warm_up_numba_fns()
+        # print("warmup complete")
 
     def warm_up_numba_fns(self):
         """Run warmup routine to compile numba methods."""
