@@ -147,6 +147,8 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
 
+
+
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
@@ -250,27 +252,68 @@ class Niter2:
                                                                    e_mat, s_mat)
         t_iter_up = curr_time() - t00
         
-        # In homogeneous coordinates
+        # In homogeneous coordinates converted to floats
         left_pts_updated = left_pts_updated.astype(float)
         left_pts_updated = right_pts_updated.astype(float)
         
         # TODO delete this and replace with DLT, will work with 3D homogeneous points
         
-        # covnert to 2D coordinate
-        left_pts_nit = left_pts_updated[:, :2]
-        right_pts_nit = right_pts_updated[:, :2]
+        
 
         # Call OpenCV triangulate to find 3D points
         
         t00 = curr_time()
-        out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, 
-                                            p_left, p_right)
+        # # covnert to 2D coordinate
+        # left_pts_nit = left_pts_updated[:, :2]
+        # right_pts_nit = right_pts_updated[:, :2]
+        # out_pts3d = self.opencv_triangulate(left_pts_nit, right_pts_nit, 
+        #                                     p_left, p_right)\
+        out_pts3d = self.two_view_triangulate(left_pts_updated,right_pts_updated,
+                                              p_left, p_right)
+        t_triangulate = curr_time() - t00
         
         if show_time_stat:
             print(f"non_iter_update: {t_iter_up} ms")
-            print(f"opencv_triangulate: {curr_time() - t00} ms")
+            print(f"triangulation: {t_triangulate} ms")
         
         return out_pts3d
+
+    def triangulate_nviews(self,p_lss:List[np.ndarray],
+                           ip_lss:List[np.ndarray])->np.ndarray:
+        """
+        Triangulate a point visible in n camera views.
+
+        p_lss is a list of camera projection matrices.
+        ip_lss is a list of homogenised image points. eg [ [x, y, 1], [x, y, 1] ], OR,
+        ip_lss is a 2d array - shape nx3 - [ [x, y, 1], [x, y, 1] ]
+        len of ip must be the same as len of P
+        TODO this method may need acceleration
+        """
+        # if not len(ip_lss) == len(p_lss):
+        #     err_msg = "Number of points and number of cameras not equal."
+        #     raise ValueError(err_msg)
+        n = len(p_lss)
+        m_mat = np.zeros([3*n, 4+n])
+        for i, (x, p) in enumerate(zip(ip_lss, p_lss)):
+            m_mat[3*i:3*i+3, :4] = p
+            m_mat[3*i:3*i+3, 4+i] = -x
+        v = np.linalg.svd(m_mat)[-1]
+        x_3d = v[-1, :4]
+        return x_3d / x_3d[3]
+
+    def two_view_triangulate(self, x1:np.ndarray, x2:np.ndarray,
+                        p1:np.ndarray, p2:np.ndarray)->np.ndarray:
+        """
+        Perform two-view triangulation.
+
+        x1,x2: (Kx3 homog. coordinates).
+        p1, p2: projection matrices
+        """
+        if not len(x2) == len(x1):
+            err_msg = "Number of points don't match."
+            raise ValueError(err_msg)
+        x_3d = [self.triangulate_nviews([p1, p2], [x[0], x[1]]) for x in zip(x1, x2)]
+        return np.array(x_3d)
 
     # TODO depreciate once DLT method is tested to work correctly
     def opencv_triangulate(self, pts1:np.ndarray, pts2:np.ndarray, 
@@ -683,12 +726,14 @@ def test_pipeline(dataset_name: str, feature_detector:str,
 
         niter2_pts3d = niter2.triangulate(left_pts, right_pts, e_mat, s_mat, rot1,
                                          p_mat_left, p_mat_right,
-                                         show_time_stat=False)
+                                         show_time_stat=True)
 
         triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         t_niter2 = (curr_time() - t1)/1000 # seconds
         niter2_time.append(t_niter2) # seconds
-        
+
+        if i == 15:
+            plot_on_3d(hs_pts3d, niter2_pts3d) # Test
 
         if full_verbose:
             #print(f"Processed image pair: {pair_processed}")
@@ -697,7 +742,7 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print(f"t_hs: {t_hs} s")
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
-        p_mat_left = np.copy(p_mat_right)
+        p_mat_left = np.copy(p_mat_right) # Update for next round
         # short verbose message
         if short_verbose:
             print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
