@@ -114,29 +114,20 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
             x_hat_prime = np.vstack((x_hat_prime, x_prime))
             #DEBUG
 
-            idx+=1
-            if (idx>4):
-                print(x_hat)
-                print()
-                print(x_hat_prime)
-                break
-
         # Breaks with Numba
-        #x_hat = np.floor(x_hat).astype(int)
-        #x_hat_prime = np.floor(x_hat_prime).astype(int)
+        x_hat = np.floor(x_hat).astype(np.int16)
+        x_hat_prime = np.floor(x_hat_prime).astype(np.int16)
         return x_hat, x_hat_prime
 
 def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
     """Vectorized version of _non_iter_update()."""
+    #! THIS VERSION DOES NOT WORK, FUTURE WORK
     e_tildae = np.dot(np.dot(s_mat, e_mat),s_mat.T) # [2x2]
     arr_add = np.ones(left_pts.shape[0], dtype=np.float32).reshape(-1,1) # [Kx1]
     x_mat = np.hstack((left_pts, arr_add)) # [Kx3]
     x_mat_prime = np.hstack((right_pts, arr_add)) # [Kx3]
-    print()
-    print(x_mat)
-    print(x_mat_prime)
     # Find directions
     n_mat = np.dot(x_mat_prime,np.dot(s_mat, e_mat).T) # [Kx2]
     n_mat_prime = np.dot(x_mat,np.dot(s_mat, e_mat.T).T) # [Kx2]
@@ -159,9 +150,9 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # Corrected x_mat and x_mat_prime
     x_mat = x_mat - np.dot(s_mat.T, delta_x.T).T # [Kx3] - [Kx3]
     x_mat_prime = x_mat_prime - np.dot(s_mat.T, delta_x_prime.T).T # [Kx3] - [Kx3]
+    # x_mat = np.floor(x_mat).astype(np.int16)
+    # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
-
-
 
 class Niter2:
     """
@@ -197,14 +188,6 @@ class Niter2:
 
     def __init__(self, algorithm:str = "niter2") -> None:
         # Initialize variables
-        # self.e_mat = np.zeros((3,3), dtype=float) # [3x3] Essential matrix, numpy
-        # self.e_tildae = np.zeros((2,2), dtype=float) # [2x2] upper left submatrix
-        # # Left right keypoints
-        # self.u_vec = np.array([[0,0,-1]], dtype=float) # [3x1], u = [u1, u2, -1]
-        # self.v_vec = np.array([[0,0,-1]], dtype=float) # [3x1], v = [v1, v2, -1]
-        # # Corrected points
-        # self.x_vec = np.array([[0,0,-1]], dtype=float) # [3x1], x = [x1,x2, -1]
-        # self.y_vec = np.array([[0,0,-1]], dtype=float) # [3x1], y = [y1,y2,-1]
         if algorithm == "niter1":
             self.algorithm = np.array([[1]], dtype=np.int8) # 1 --> niter1
         else:
@@ -235,10 +218,6 @@ class Niter2:
         x_hat_prime: [Kx3] updated right points in homogeneous coord
         """
         # Initialize constant variables
-    
-        # x_hat, x_hat_prime = _non_iter_update(self.algorithm, left_pts, right_pts,
-        #                                       e_mat,s_mat) # Functional, gives correct solution
-        
         x_hat, x_hat_prime = _non_iter_vectorized(self.algorithm, left_pts, right_pts,
                                               e_mat,s_mat)
 
@@ -277,9 +256,6 @@ class Niter2:
                                                                    np.copy(right_pts),
                                                                    e_mat, s_mat)
         print(f"non_iter_update: {curr_time() - t00} ms")
-        
-        # left_pts_updated, right_pts_updated = self.non_iter_update(left_pts, right_pts,
-        #                                                            e_mat, s_mat)
         # in homogeneous coordinates
         # left_pts_nit = left_pts_updated.astype(np.float32)
         # right_pts_nit = right_pts_updated.astype(np.float32)
@@ -712,16 +688,15 @@ def test_pipeline(dataset_name: str, feature_detector:str,
             print(f"t_niter2: {t_niter2} s")
         pair_processed+=1
         p_mat_left = np.copy(p_mat_right)
-        break # Only do one image pair
+        # break # Only do one image pair
 
     # Print statistics
-
-    # hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
-    # niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
-    # print()
-    # print(f"points/sec by hs method: {int(hs_pts_sec)}")
-    # print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
-    # # TODO mean relative error
-    # print()
-    # plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
-    # cv2.destroyAllWindows()
+    hs_pts_sec = compute_points_per_sec(triangualted_pts_hs, hs_time)
+    niter_pts_sec = compute_points_per_sec(triangulated_pts_niter2, niter2_time)
+    print()
+    print(f"points/sec by hs method: {int(hs_pts_sec)}")
+    print(f"points/sec by niter2 method: {int(niter_pts_sec)}")
+    # TODO mean relative error
+    print()
+    plot_on_3d(hs_pts3d, niter2_pts3d) # Only generate image once?
+    cv2.destroyAllWindows()
