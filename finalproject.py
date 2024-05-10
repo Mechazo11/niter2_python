@@ -776,8 +776,6 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         t_niter2 = (curr_time() - t1)/1000 # seconds
         niter2_time.append(t_niter2) # seconds
 
-        plot_on_3d(hs_pts3d, niter2_pts3d) # Test
-
         if full_verbose:
             #print(f"Processed image pair: {pair_processed}")
             print(f"hs: triangulated points: {hs_pts3d.shape[0]}")
@@ -790,7 +788,8 @@ def test_pipeline(dataset_name: str, feature_detector:str,
         if short_verbose:
             print(f"Image pair: {pair_processed} contains {left_pts.shape[0]} kp pts.")
         
-        if i == 5:
+        if i == 1:
+            plot_on_3d(hs_pts3d, niter2_pts3d) # Test
             break # Only do one image pair
 
     # Print statistics
