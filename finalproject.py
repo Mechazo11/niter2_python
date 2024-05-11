@@ -20,13 +20,14 @@ AI: ChatGPT
 #Imports
 import numpy as np
 import matplotlib.pyplot as plt
-from numba import jit, prange
+from numba import jit
 import time
 from typing import Tuple, List
 import yaml
 from pathlib import Path
 import natsort
 import cv2
+np.set_printoptions(suppress=True)
 
 # Utility functions
 def curr_time():
@@ -427,10 +428,10 @@ class Results:
                 if rmse_val <= self.rmse_thres:
                     self.rmse_scores.append(rmse_val)
                     self.to_plot.append([rmse_val, hs_pts3d, niter2_pts3d])
-        print(f"Number of good matches: {len(self.to_plot)}")
         # Sort them based on the smallest to progressively largest error
         self.to_plot.sort(key=lambda x: x[0])
         # DEBUG
+        # print(f"Number of good matches: {len(self.to_plot)}")
         # for iox in self.to_plot:
         #     print(f"rmse_val: {iox[0]}")
 
