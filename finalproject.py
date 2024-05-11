@@ -118,36 +118,6 @@ def _non_iter_update(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndar
         x_hat_prime = np.floor(x_hat_prime).astype(np.int32)
         return x_hat, x_hat_prime
 
-@jit(nopython = True, parallel = False)
-def _triangulate_nviews(p1: np.ndarray, p2: np.ndarray,
-                        x1: np.ndarray, x2: np.ndarray) -> np.ndarray:
-    """
-    Triangulate a point visible in two camera views.
-
-    p1, p2: 3x4 projection matrices.
-    x1, x2: 3x1 homogeneous coordinates (2D points).
-
-    Based on,
-    Hartley, Richard, and Andrew Zisserman. 
-    Multiple View Geometry in Computer Vision. 2nd ed.,
-    Cambridge University Press, 2004.
-    Chapter 12.2: "Triangulation" (especially pages 312–317).
-    """
-    # Prepare the matrix for two views
-    # 3 rows per view, 4 for the projection matrix + 1 for the homogeneous coordinates
-    m_mat = np.zeros((6,5), dtype=np.float32)
-    # Fill in the matrix with data for the first view
-    m_mat[0:3, :4] = p1
-    m_mat[0:3, 4] = -x1
-    # Fill in the matrix with data for the second view
-    m_mat[3:6, :4] = p2
-    m_mat[3:6, 4] = -x2
-    # Perform SVD
-    _, _, v = np.linalg.svd(m_mat)
-    x_3d = v[-1, :4]
-    # Return homogeneous 3D coordinate
-    return x_3d / x_3d[3]
-
 def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.ndarray,
                            e_mat:np.ndarray, s_mat:np.ndarray)->Tuple[np.ndarray,
                                                                       np.ndarray]:
@@ -183,84 +153,53 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
 
-def triangulate_v2(C1, pts1, C2, pts2):
+def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarray):
     """
     Q3.2: Triangulate a set of 2D coordinates in the image to a set of 3D points.
 
-    Input:  C1, the 3x4 camera matrix
-            pts1, the Nx2 matrix with the 2D image coordinates per row
-            C2, the 3x4 camera matrix
-            pts2, the Nx2 matrix with the 2D image coordinates per row
-    Output: P, the Nx3 matrix with the corresponding 3D points per row
-            err, the reprojection error.
+    Input:
+    p1: [3x4] projection matrix for left image
+    pts1: [Kx2] matches keypoints from left image
+    p2: [3x4] projection matrix from rihgt image
+    pts2: [Kx2] matched keypoints from right image
+
+    Output:
+    p_i,t[Nx3] matrix with the corresponding 3D points per row
     """
     # TRIANGULATION
     # http://cmp.felk.cvut.cz/cmp/courses/TDV/2012W/lectures/tdv-2012-07-anot.pdf
+    # Adopted from
     # https://github.com/laavanyebahl/3D-Reconstruction-and-Epipolar-Geometry/blob/aa68896b32f58eb6f028cdab632d196b191199e4/python/submission.py#L142
-
-    # Form of Triangulation :
-    #
-    # x = C.X
-    #
-    # |x|             | u |
-    # |y| =   C(3x4). | v |
-    # |1|             | w |
-    #                 | 1 |
-    #
-    # 1 = C_3 . X
-    #
-    # x_i . (C_3_i.X_i) = C_1_i.X_i
-    # y_i.  (C_3_i.X_i) = C_2_i.X_i
-
-    # Subtract RHS from LHS and equate to 0
-    # Take X common to get AX=0
-    # Solve for X with SVD
-    # for 2 points we have four equation
-
-    P_i = []
+    p_i = []
     for i in range(pts1.shape[0]):
-        A = np.array([   pts1[i,0]*C1[2,:] - C1[0,:] ,
+        a_mat = np.array([   pts1[i,0]*C1[2,:] - C1[0,:] ,
                          pts1[i,1]*C1[2,:] - C1[1,:] ,
                          pts2[i,0]*C2[2,:] - C2[0,:] ,
                          pts2[i,1]*C2[2,:] - C2[1,:]   ])
-
-        # print('A shape: ', A.shape)
-        u, s, vh = np.linalg.svd(A)
+        _, _, vh = np.linalg.svd(A)
         v = vh.T
         X = v[:,-1]
         # NORMALIZING
         X = X/X[-1]
         # print(X)
         P_i.append(X)
-
     P_i = np.asarray(P_i)
-
     # MULTIPLYING TOGETHER WIH ALL ELEMENET OF Ps
     pts1_out = np.matmul(C1, P_i.T )
     pts2_out = np.matmul(C2, P_i.T )
-
     pts1_out = pts1_out.T
     pts2_out = pts2_out.T
-
     # NORMALIZING
     for i in range(pts1_out.shape[0]):
         pts1_out[i,:] = pts1_out[i,:] / pts1_out[i, -1]
         pts2_out[i,:] = pts2_out[i,:] / pts2_out[i, -1]
-
     # NON - HOMOGENIZING
     pts1_out = pts1_out[:, :-1]
     pts2_out = pts2_out[:, :-1]
-
-    # CALCULATING REPROJECTION ERROR
-    reprojection_err = 0
-    for i in range(pts1_out.shape[0]):
-        reprojection_err = reprojection_err  + np.linalg.norm( pts1[i,:] - pts1_out[i,:] )**2 + np.linalg.norm( pts2[i,:] - pts2_out[i,:] )**2
-    # print(reprojection_err)
-
     # NON-HOMOGENIZING
     P_i = P_i[:, :-1]
 
-    return P_i, reprojection_err
+    return P_i
 
 
 class Niter2:
@@ -379,9 +318,6 @@ class Niter2:
         left_pts_updated = right_pts_updated.astype(float)
         # Use DLT to triangulate 3D points
         t11 = curr_time()
-        # out_pts3d = self.two_view_linear_triangulate(left_pts_updated,
-        #                                              right_pts_updated,
-        #                                              p_left, p_right) # [Kx3]
         lp = left_pts_updated[:,:2]
         rp = right_pts_updated[:,:2]
         out_pts3d,_ = triangulate_v2(p_left, lp, p_right,rp) # [Kx3]
@@ -391,45 +327,6 @@ class Niter2:
             print(f"non_iter_update: {t01 - t00} ms")
             print(f"triangulation: {t12 - t11} ms")
         return out_pts3d, [t_optimal_pts, t_triangulate]
-
-    def triangulate_nviews(self,p_lss:List[np.ndarray],
-                           ip_lss:List[np.ndarray])->np.ndarray:
-        """
-        Triangulate a point visible in n camera views.
-
-        p_lss is a list of camera projection matrices.
-        ip_lss is a list of homogenised image points. eg [ [x, y, 1], [x, y, 1] ], OR,
-        ip_lss is a 2d array - shape nx3 - [ [x, y, 1], [x, y, 1] ]
-        len of ip must be the same as len of P
-        TODO this method may need acceleration
-        """
-        x_3d = _triangulate_nviews(p_lss[0], p_lss[1], ip_lss[0], ip_lss[1])
-
-        return x_3d / x_3d[3]
-
-    def two_view_linear_triangulate(self, x1:np.ndarray, x2:np.ndarray,
-                        p1:np.ndarray, p2:np.ndarray)->np.ndarray:
-        """
-        Perform two-view triangulation.
-
-        Solve A.P = 0 problem using linear triangulation as described in
-        Chapter 12.2 in Hartley and Zisserman, Multi View Geometry
-
-        x1,x2: [Kx3] 2D matches in hom. coordinates.
-        p1, p2: [3x4] projection matrices
-        """
-        if not len(x2) == len(x1):
-            err_msg = "Number of points don't match."
-            raise ValueError(err_msg)
-        # x_3d = [self.triangulate_nviews([p1, p2], [x[0], x[1]]) for x in zip(x1, x2)]
-
-        x_3d = []
-        for i in range(x1.shape[0]):
-            point_3d = self.triangulate_nviews([p1, p2], [x1[i], x2[i]])
-            x_3d.append(point_3d)
-        x_3d = np.array(x_3d) # [Kx4]
-        x_3d = x_3d[:,0:3] # Drop the last column
-        return x_3d
 
 class DataSetLoader:
     """

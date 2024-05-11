@@ -79,3 +79,5 @@ TODO the commands to setup enviornment
 [13] Numba, "A ~5 minutes guide to Numba", URL: https://numba.pydata.org/numba-doc/dev/user/5minguide.html
 
 [14] Amy Tabb, "N-view triangulation: DLT method", URL: https://amytabb.com/tips/tutorials/2021/10/31/triangulation-DLT-2-3/
+
+[15] R. Sara, (2012), "The Triangulation Problem", URL: http://cmp.felk.cvut.cz/cmp/courses/TDV/2012W/lectures/tdv-2012-07-anot.pdf
