@@ -199,7 +199,6 @@ def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarra
     p_i = p_i[:, :-1]
     return p_i # [Kx3]
 
-
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
