@@ -612,8 +612,7 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     plt.tight_layout()
     plt.show()
 
-def show_epilines(dataset_name: str, feature_detector:str,
-             show_verbose:bool = False)->None:
+def show_epilines(dataset_name: str, feature_detector:str)->None:
     """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
     if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
         err_msg = "choose either 'ORB' or 'SIFT' feature."
@@ -637,14 +636,44 @@ def show_epilines(dataset_name: str, feature_detector:str,
     # DEBUG
     generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
 
-    # DEBUG print stats
-    if show_verbose:
-        print()
-        print(f"Number of images in dataset: {dataloader.num_images}")
-        print(f"Feature detector selected: {feature_detector}")
-        print(f"Pts matched: {len(left_pts)}")
-        print(f"Fundamental matrix computed: {f_mat}")
-        print()
+    # # DEBUG print stats
+    # if show_verbose:
+    #     print()
+    #     print(f"Number of images in dataset: {dataloader.num_images}")
+    #     print(f"Feature detector selected: {feature_detector}")
+    #     print(f"Pts matched: {len(left_pts)}")
+    #     print(f"Fundamental matrix computed: {f_mat}")
+    #     print()
+
+def demo_epilines(dataset_name: str)->None:
+    """
+    Demonstrate correct setup of feature detectors using epiline images.
+    
+    2x2 image is generated for the two features selected
+    """
+    # Intialize variables
+    left_img = None
+    right_img = None
+    left_pts_sift, right_pts_sift = [],[]
+    left_pts_orb, right_pts_orb = [],[]
+    f_mat_sift = np.zeros((0),dtype=float)
+    f_mat_orb = np.zeros((0),dtype=float)
+
+    # Define objects
+    dataloader = DataSetLoader(dataset_name)
+    lp = dataloader.image_path_lss[0]
+    rp = dataloader.image_path_lss[1]
+    
+    # Load images and make them grayscale
+    left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
+    right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
+    
+    # SIFT
+    left_pts, right_pts = detect_features_and_track("SIFT",left_img, right_img)
+    # pts1, pts2 updated in place through return
+    f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
+    # DEBUG
+    generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
 
 def compute_essential_matrix(f_mat:np.ndarray, k_mat:np.ndarray)->np.ndarray:
     """Compute essential matrix given K and F."""
