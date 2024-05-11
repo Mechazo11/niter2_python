@@ -157,6 +157,9 @@ def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarra
     """
     Q3.2: Triangulate a set of 2D coordinates in the image to a set of 3D points.
 
+    # Adopted from
+    # https://github.com/laavanyebahl/3D-Reconstruction-and-Epipolar-Geometry/blob/aa68896b32f58eb6f028cdab632d196b191199e4/python/submission.py#L142
+
     Input:
     p1: [3x4] projection matrix for left image
     pts1: [Kx2] matches keypoints from left image
@@ -166,27 +169,23 @@ def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarra
     Output:
     p_i,t[Nx3] matrix with the corresponding 3D points per row
     """
-    # TRIANGULATION
-    # http://cmp.felk.cvut.cz/cmp/courses/TDV/2012W/lectures/tdv-2012-07-anot.pdf
-    # Adopted from
-    # https://github.com/laavanyebahl/3D-Reconstruction-and-Epipolar-Geometry/blob/aa68896b32f58eb6f028cdab632d196b191199e4/python/submission.py#L142
     p_i = []
     for i in range(pts1.shape[0]):
-        a_mat = np.array([   pts1[i,0]*C1[2,:] - C1[0,:] ,
-                         pts1[i,1]*C1[2,:] - C1[1,:] ,
-                         pts2[i,0]*C2[2,:] - C2[0,:] ,
-                         pts2[i,1]*C2[2,:] - C2[1,:]   ])
-        _, _, vh = np.linalg.svd(A)
+        a_mat = np.array([   pts1[i,0]*p1[2,:] - p1[0,:] ,
+                         pts1[i,1]*p1[2,:] - p1[1,:] ,
+                         pts2[i,0]*p1[2,:] - p1[0,:] ,
+                         pts2[i,1]*p2[2,:] - p2[1,:]   ])
+        _, _, vh = np.linalg.svd(a_mat)
         v = vh.T
-        X = v[:,-1]
+        x_pt = v[:,-1]
         # NORMALIZING
-        X = X/X[-1]
+        x_pt = x_pt/x_pt[-1]
         # print(X)
-        P_i.append(X)
-    P_i = np.asarray(P_i)
+        p_i.append(x_pt)
+    p_i = np.asarray(p_i)
     # MULTIPLYING TOGETHER WIH ALL ELEMENET OF Ps
-    pts1_out = np.matmul(C1, P_i.T )
-    pts2_out = np.matmul(C2, P_i.T )
+    pts1_out = np.matmul(p1, p_i.T )
+    pts2_out = np.matmul(p2, p_i.T )
     pts1_out = pts1_out.T
     pts2_out = pts2_out.T
     # NORMALIZING
@@ -197,9 +196,8 @@ def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarra
     pts1_out = pts1_out[:, :-1]
     pts2_out = pts2_out[:, :-1]
     # NON-HOMOGENIZING
-    P_i = P_i[:, :-1]
-
-    return P_i
+    p_i = p_i[:, :-1]
+    return p_i # [Kx3]
 
 
 class Niter2:
@@ -252,13 +250,6 @@ class Niter2:
         ep = np.ones([3,3], dtype=float)
         sp = self.s_mat
         _non_iter_update(self.algorithm, lp, rp, ep,sp)
-        p1 = np.array([[500, 0, 320, 0], [0, 500, 240, 0], [0, 0, 1, 0]],
-                      dtype=np.float32)
-        p2 = np.array([[500, 0, 320, -100], [0, 500, 240, 0], [0, 0, 1, 0]],
-                      dtype=np.float32)
-        x1 = np.array([400, 300, 1], dtype=np.float32)
-        x2 = np.array([420, 310, 1], dtype=np.float32)
-        _triangulate_nviews(p1,p2,x1,x2)
         print("Niter2: Numba accelerated methods ready.")
         print()
 
@@ -283,7 +274,7 @@ class Niter2:
                            e_mat:np.ndarray, s_mat:np.ndarray,
                            rot:np.ndarray, p_left:np.ndarray,
                            p_right:np.ndarray,
-                           show_time_stat:bool = True)->Tuple[np.ndarray, List]:
+                           show_time_stat:bool = False)->Tuple[np.ndarray, List]:
         """
         Perform triangulation using niter2 algorithm for all 3D points.
 
@@ -753,8 +744,6 @@ def plot3d_test(arr1, arr2):
     ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
             marker='+')
 
-
-
 def perform_experiment(dataset_name: str, feature_detector:str,
                   full_verbose:bool = False,
                   short_verbose:bool = False)->None:
@@ -815,7 +804,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         niter2_pts3d,t_lss = niter2.triangulate_niter2(left_pts, right_pts,
                                                     e_mat, s_mat, rot1,
                                                     p_mat_left, p_mat_right,
-                                                    show_time_stat=False)
+                                                    show_time_stat=True)
         results.pts_3d_niter2_lss.append(niter2_pts3d)
         results.triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         results.niter2_time.append(t_lss[0])
