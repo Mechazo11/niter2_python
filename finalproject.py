@@ -590,7 +590,8 @@ def drawlines(img1:np.ndarray,img2:np.ndarray,
     return img1,img2
 
 def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
-                   f_mat:np.ndarray, left_pts:List,right_pts:List)->None:
+                   f_mat:np.ndarray, left_pts:List,
+                   right_pts:List)->Tuple[np.ndarray, np.ndarray]:
     """
     Draw epilines between the two images.
     
@@ -607,11 +608,13 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     lines2 = cv2.computeCorrespondEpilines(left_pts.reshape(-1,1,2), 1,f_mat)
     lines2 = lines2.reshape(-1,3)
     right_epiline_img,_ = drawlines(right_img,left_img,lines2,right_pts,left_pts)
-    plt.subplot(1,2,1),plt.imshow(left_epliline_img), plt.title('Left Epiline Image')
-    plt.subplot(1,2,2),plt.imshow(right_epiline_img), plt.title('Right Epiline Image')
-    plt.tight_layout()
-    plt.show()
+    # plt.subplot(1,2,1),plt.imshow(left_epliline_img), plt.title('Left Epiline Image')
+    # plt.subplot(1,2,2),plt.imshow(right_epiline_img), plt.title('Right Epiline Image')
+    # plt.tight_layout()
+    # plt.show()
+    return left_epliline_img, right_epiline_img
 
+# TODO deprecite
 def show_epilines(dataset_name: str, feature_detector:str)->None:
     """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
     if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
@@ -658,6 +661,7 @@ def demo_epilines(dataset_name: str)->None:
     left_pts_orb, right_pts_orb = [],[]
     f_mat_sift = np.zeros((0),dtype=float)
     f_mat_orb = np.zeros((0),dtype=float)
+    fig, axs = plt.subplots(2, 2) # Setup 2x2 subplot
 
     # Define objects
     dataloader = DataSetLoader(dataset_name)
@@ -670,10 +674,30 @@ def demo_epilines(dataset_name: str)->None:
     
     # SIFT
     left_pts, right_pts = detect_features_and_track("SIFT",left_img, right_img)
-    # pts1, pts2 updated in place through return
-    f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
-    # DEBUG
-    generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
+    f_mat_sift, left_pts_sift, right_pts_sift = compute_fundamental_matrix(left_pts,
+                                                                           right_pts)
+    left_sift_ep, right_sift_ep = generate_epipline_imgs(left_img, right_img,f_mat_sift,
+                                                   left_pts_sift, right_pts_sift)
+
+    # ORB
+    left_pts, right_pts = detect_features_and_track("ORB",left_img, right_img)
+    f_mat_orb, left_pts_orb, right_pts_orb = compute_fundamental_matrix(left_pts,
+                                                                        right_pts)
+    left_orb_ep, right_orb_ep = generate_epipline_imgs(left_img, right_img,f_mat_orb,
+                                                   left_pts_orb, right_pts_orb)
+
+    # Populate plots
+    axs[0, 0].imshow(left_sift_ep)
+    axs[0, 1].imshow(right_sift_ep)
+    axs[1, 0].imshow(left_orb_ep)
+    axs[1, 1].imshow(right_orb_ep)
+    # Add titles
+    axs[0, 0].set_title('Left epiline images:SIFT')
+    axs[0, 1].set_title('Right epiline image:SIFT')
+    axs[1, 0].set_title('Left epiline images:ORB')
+    axs[1, 1].set_title('Right epiline image:ORB')
+    plt.tight_layout()
+    plt.show()
 
 def compute_essential_matrix(f_mat:np.ndarray, k_mat:np.ndarray)->np.ndarray:
     """Compute essential matrix given K and F."""
