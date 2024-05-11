@@ -248,7 +248,9 @@ class Niter2:
         rp = np.array([[2,2]],dtype=float)
         ep = np.ones([3,3], dtype=float)
         sp = self.s_mat
-        _non_iter_update(self.algorithm, lp, rp, ep,sp)
+        for _ in range(5):
+            # run 5 times to stabilize?
+            _non_iter_update(self.algorithm, lp, rp, ep,sp)
         print("Niter2: Numba accelerated methods ready.")
         print()
 
@@ -439,33 +441,35 @@ class Results:
                 pass
             else:
                 if rmse_val <= self.rmse_thres:
+                    self.rmse_scores.append(rmse_val)
                     self.to_plot.append([rmse_val, hs_pts3d, niter2_pts3d])
         print(f"Number of good matches: {len(self.to_plot)}")
         # Sort them based on the smallest to progressively largest error
         self.to_plot.sort(key=lambda x: x[0])
-        for iox in self.to_plot:
-            print(f"rmse_val: {iox[0]}")
+        # DEBUG
+        # for iox in self.to_plot:
+        #     print(f"rmse_val: {iox[0]}")
 
     def generate_plots(self) -> None:
         """Plot 1x2 subplots showing two cases."""
-        self.compute_rmse_get_best_points()
-        plot_cand1 = self.to_plot[3]
+        plot_cand1 = self.to_plot[0]
         plot_cand2 = self.to_plot[-1]
         # Create 1x2 subplot layout
-        fig, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
+        _, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={'projection': '3d'},
+                                     figsize=(12,6))
         # Plot the first candidate in the first subplot
         self.plot_on_3d(ax1, plot_cand1[1], plot_cand1[2])
         # Plot the second candidate in the second subplot
         self.plot_on_3d(ax2, plot_cand2[1], plot_cand2[2])
-        ax1.set_title(f'RMSE: {plot_cand1[0]}')
-        ax2.set_title(f'RMSE: {plot_cand2[0]}')
+        ax1.set_title(f'RMSE: {plot_cand1[0]:.3f} for {plot_cand1[1].shape[0]} points')
+        ax2.set_title(f'RMSE: {plot_cand2[0]:.3f} for {plot_cand2[1].shape[0]} points')
         plt.show()
 
     def plot_on_3d(self, ax ,hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
         """Plot 3D points from hs and niter2 on a 3D isometric plot."""
         # Configure plot
-        fig = plt.figure()
-        ax = fig.add_subplot(projection='3d')
+        # fig = plt.figure()
+        # ax = fig.add_subplot(projection='3d')
         # Plot hs_pts3d points
         xs = hs_pts3d[:, 0]
         ys = hs_pts3d[:, 1]
@@ -478,10 +482,10 @@ class Results:
         ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
                 marker='+')
         # # Set labels
-        # ax.set_xlabel('X')
-        # ax.set_ylabel('Y')
-        # ax.set_zlabel('Z')
-        # ax.legend()
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.legend()
 
     def compute_points_per_sec(self, lss_pts:List[np.ndarray],
                                lss_time:List[float])->float:
@@ -491,8 +495,8 @@ class Results:
         _pts_sec = _total_pts / _total_time
         return _pts_sec
 
-    def generate_points_sec(self):
-        """Print points/sec stats from the experiment."""
+    def generate_stats(self):
+        """Print stats from the experiment."""
         hs_pts_sec = self.compute_points_per_sec(self.triangualted_pts_hs,
                                                  self.hs_time)
         niter_pts_sec = self.compute_points_per_sec(self.triangulated_pts_niter2,
@@ -500,6 +504,7 @@ class Results:
         print()
         print(f"HS method: {int(hs_pts_sec/ 1000)}K points/sec")
         print(f"Niter2 method: {int(niter_pts_sec/1000)}K points/sec")
+        print(f"Average relative RMSE error: {np.mean(np.array(self.rmse_scores))}")
         print()
 
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
@@ -583,7 +588,8 @@ def compute_fundamental_matrix(pts1:List, pts2:List)->Tuple[np.ndarray, List, Li
     in_pts2 = pts2[mask.ravel()==1]
     return fundamental_mat, in_pts1, in_pts2
 
-def drawlines(img1:np.ndarray,img2:np.ndarray,lines,pts1,pts2)->Tuple[np.ndarray, np.ndarray]:
+def drawlines(img1:np.ndarray,img2:np.ndarray,
+              lines,pts1,pts2)->Tuple[np.ndarray, np.ndarray]:
     """Draw epilines on img2 w.r.t img1."""
     # Adopted from https://docs.opencv.org/4.x/da/de9/tutorial_py_epipolar_geometry.html
     r,c = img1.shape
@@ -762,6 +768,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
     start_idx = 15 # Trial and error, the scale is mostly stable now
     for i in range(start_idx, dataloader.num_images - 1):
         # Initialize variables
+        tx = curr_time()
         left_img = None
         right_img = None
         left_pts, right_pts = [],[]
@@ -803,7 +810,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         niter2_pts3d,t_lss = niter2.triangulate_niter2(left_pts, right_pts,
                                                     e_mat, s_mat, rot1,
                                                     p_mat_left, p_mat_right,
-                                                    show_time_stat=True)
+                                                    show_time_stat=False)
         results.pts_3d_niter2_lss.append(niter2_pts3d)
         results.triangulated_pts_niter2.append(niter2_pts3d.shape[0])
         results.niter2_time.append(t_lss[0])
@@ -817,13 +824,14 @@ def perform_experiment(dataset_name: str, feature_detector:str,
             print(f"t_niter2 DLT triangulation: {t_lss[1]} s")
             print()
         pairs_processed+=1
+        ty = curr_time() - tx
         # p_mat_left = np.copy(p_mat_right) # Formulation does not need it
         # short verbose message
         if short_verbose:
-            print(f"Image pair: {pairs_processed} contains {left_pts.shape[0]} kp pts.")
+            print(f"Image pair: {pairs_processed}, {left_pts.shape[0]} pts, time: {ty}")
             #plot3d_test(hs_pts3d, niter2_pts3d)
         # DEBUG
-        # if pairs_processed == 5:
+        # if pairs_processed == 7:
         #     break
 
         # end of loop
