@@ -61,9 +61,6 @@ Based on this [gist](https://gist.github.com/davegreenwood/e1d2227d08e24cc4e353d
 
 5. Using opencv: https://docs.opencv.org/4.x/d9/d0c/group__calib3d.html#ga54a2f5b3f8aeaf6c76d4a31dece85d5d
 
-6. More useful information on point triangulation: https://inst.eecs.berkeley.edu/~ee290t/fa19/lectures/lecture10-3-decomposing-F-matrix-into-Rotation-and-Translation.pdf
-
-8. Another note on Triangualation, [SfM](https://www.youtube.com/watch?v=JlOzyyhk1v0)
 
 9. [Project 3 / Camera Calibration and Fundamental Matrix Estimation with RANSAC](https://sites.cc.gatech.edu/classes/AY2016/cs4476_fall/results/proj3/html/euzun3/index.html) is a good reference that uses Notre Dame dataset
 
