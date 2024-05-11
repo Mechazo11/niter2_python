@@ -311,7 +311,7 @@ class Niter2:
         t11 = curr_time()
         lp = left_pts_updated[:,:2]
         rp = right_pts_updated[:,:2]
-        out_pts3d,_ = triangulate_v2(p_left, lp, p_right,rp) # [Kx3]
+        out_pts3d = triangulate_v2(p_left, lp, p_right, rp) # [Kx3]
         t12 = curr_time()
         t_triangulate = (t12 - t11)/1000 # seconds
         if show_time_stat:
@@ -822,11 +822,10 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         # short verbose message
         if short_verbose:
             print(f"Image pair: {pairs_processed} contains {left_pts.shape[0]} kp pts.")
-        
-        plot3d_test(hs_pts3d, niter2_pts3d)
-
-        if pairs_processed == 5:
-            break
+            #plot3d_test(hs_pts3d, niter2_pts3d)
+        # DEBUG
+        # if pairs_processed == 5:
+        #     break
 
         # end of loop
     results.pair_processed = pairs_processed
