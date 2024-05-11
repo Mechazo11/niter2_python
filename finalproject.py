@@ -469,6 +469,9 @@ class Results:
                     self.to_plot.append([rmse_val, hs_pts3d, niter2_pts3d])
         print(f"Number of good matches: {len(self.to_plot)}")
         # Sort them based on the smallest to progressively largest error
+        self.to_plot.sort(key=lambda x: x[0])
+        for iox in self.to_plot:
+            print(f"rmse_val: {iox[0]}")
 
     def compute_points_per_sec(self, lss_pts:List[np.ndarray],
                                lss_time:List[float])->float:
@@ -478,8 +481,23 @@ class Results:
         _pts_sec = _total_pts / _total_time
         return _pts_sec
 
-    def generate_plots(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
-        """Plot 1x3 subplots showing the best three cases."""
+    def generate_plots(self) -> None:
+        """Plot 1x2 subplots showing two cases."""
+        self.compute_rmse_get_best_points()
+        plot_cand1 = self.to_plot[2]
+        plot_cand2 = self.to_plot[-1]
+        # Create 1x2 subplot layout
+        fig, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={'projection': '3d'})
+        # Plot the first candidate in the first subplot
+        self.plot_on_3d(ax1, plot_cand1[1], plot_cand1[2])
+        ax1.set_title(f'RMSE: {plot_cand1[0]}')
+        # Plot the second candidate in the second subplot
+        self.plot_on_3d(ax2, plot_cand2[1], plot_cand2[2])
+        ax2.set_title(f'RMSE: {plot_cand2[0]}')
+        plt.show()
+
+    def plot_on_3d(self, ax ,hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
+        """Plot 3D points from hs and niter2 on a 3D isometric plot."""
         # Configure plot
         fig = plt.figure()
         ax = fig.add_subplot(projection='3d')
@@ -494,35 +512,11 @@ class Results:
         zs_niter2 = niter2_pts3d[:, 2]
         ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
                 marker='+')
-        # Set labels
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.legend()
-        plt.show()
-
-    # def generate_plots(self, hs_pts3d: np.ndarray, niter2_pts3d: np.ndarray) -> None:
-    #     """Plot 1x3 subplots showing the best three cases."""
-    #     # Configure plot
-    #     fig = plt.figure()
-    #     ax = fig.add_subplot(projection='3d')
-    #     # Plot hs_pts3d points
-    #     xs = hs_pts3d[:, 0]
-    #     ys = hs_pts3d[:, 1]
-    #     zs = hs_pts3d[:, 2]
-    #     ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
-    #     # Plot niter2_pts3d points in orange
-    #     xs_niter2 = niter2_pts3d[:, 0]
-    #     ys_niter2 = niter2_pts3d[:, 1]
-    #     zs_niter2 = niter2_pts3d[:, 2]
-    #     ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
-    #             marker='+')
-    #     # Set labels
-    #     ax.set_xlabel('X')
-    #     ax.set_ylabel('Y')
-    #     ax.set_zlabel('Z')
-    #     ax.legend()
-    #     plt.show()
+        # # Set labels
+        # ax.set_xlabel('X')
+        # ax.set_ylabel('Y')
+        # ax.set_zlabel('Z')
+        # ax.legend()
 
     def generate_points_sec(self):
         """Print points/sec stats from the experiment."""
@@ -834,7 +828,7 @@ def perform_experiment(dataset_name: str, feature_detector:str,
             print(f"t_niter2 DLT triangulation: {t_lss[1]} s")
             print()
         pairs_processed+=1
-        p_mat_left = np.copy(p_mat_right) # Update for next round
+        # p_mat_left = np.copy(p_mat_right) # Formulation does not need it
         # short verbose message
         if short_verbose:
             print(f"Image pair: {pairs_processed} contains {left_pts.shape[0]} kp pts.")
