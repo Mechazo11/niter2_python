@@ -183,6 +183,86 @@ def _non_iter_vectorized(algorithm:np.ndarray,left_pts:np.ndarray, right_pts:np.
     # x_mat_prime = np.floor(x_mat_prime).astype(np.int16)
     return x_mat, x_mat_prime
 
+def triangulate_v2(C1, pts1, C2, pts2):
+    """
+    Q3.2: Triangulate a set of 2D coordinates in the image to a set of 3D points.
+
+    Input:  C1, the 3x4 camera matrix
+            pts1, the Nx2 matrix with the 2D image coordinates per row
+            C2, the 3x4 camera matrix
+            pts2, the Nx2 matrix with the 2D image coordinates per row
+    Output: P, the Nx3 matrix with the corresponding 3D points per row
+            err, the reprojection error.
+    """
+    # TRIANGULATION
+    # http://cmp.felk.cvut.cz/cmp/courses/TDV/2012W/lectures/tdv-2012-07-anot.pdf
+    # https://github.com/laavanyebahl/3D-Reconstruction-and-Epipolar-Geometry/blob/aa68896b32f58eb6f028cdab632d196b191199e4/python/submission.py#L142
+
+    # Form of Triangulation :
+    #
+    # x = C.X
+    #
+    # |x|             | u |
+    # |y| =   C(3x4). | v |
+    # |1|             | w |
+    #                 | 1 |
+    #
+    # 1 = C_3 . X
+    #
+    # x_i . (C_3_i.X_i) = C_1_i.X_i
+    # y_i.  (C_3_i.X_i) = C_2_i.X_i
+
+    # Subtract RHS from LHS and equate to 0
+    # Take X common to get AX=0
+    # Solve for X with SVD
+    # for 2 points we have four equation
+
+    P_i = []
+    for i in range(pts1.shape[0]):
+        A = np.array([   pts1[i,0]*C1[2,:] - C1[0,:] ,
+                         pts1[i,1]*C1[2,:] - C1[1,:] ,
+                         pts2[i,0]*C2[2,:] - C2[0,:] ,
+                         pts2[i,1]*C2[2,:] - C2[1,:]   ])
+
+        # print('A shape: ', A.shape)
+        u, s, vh = np.linalg.svd(A)
+        v = vh.T
+        X = v[:,-1]
+        # NORMALIZING
+        X = X/X[-1]
+        # print(X)
+        P_i.append(X)
+
+    P_i = np.asarray(P_i)
+
+    # MULTIPLYING TOGETHER WIH ALL ELEMENET OF Ps
+    pts1_out = np.matmul(C1, P_i.T )
+    pts2_out = np.matmul(C2, P_i.T )
+
+    pts1_out = pts1_out.T
+    pts2_out = pts2_out.T
+
+    # NORMALIZING
+    for i in range(pts1_out.shape[0]):
+        pts1_out[i,:] = pts1_out[i,:] / pts1_out[i, -1]
+        pts2_out[i,:] = pts2_out[i,:] / pts2_out[i, -1]
+
+    # NON - HOMOGENIZING
+    pts1_out = pts1_out[:, :-1]
+    pts2_out = pts2_out[:, :-1]
+
+    # CALCULATING REPROJECTION ERROR
+    reprojection_err = 0
+    for i in range(pts1_out.shape[0]):
+        reprojection_err = reprojection_err  + np.linalg.norm( pts1[i,:] - pts1_out[i,:] )**2 + np.linalg.norm( pts2[i,:] - pts2_out[i,:] )**2
+    # print(reprojection_err)
+
+    # NON-HOMOGENIZING
+    P_i = P_i[:, :-1]
+
+    return P_i, reprojection_err
+
+
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
@@ -264,7 +344,7 @@ class Niter2:
                            e_mat:np.ndarray, s_mat:np.ndarray,
                            rot:np.ndarray, p_left:np.ndarray,
                            p_right:np.ndarray,
-                           show_time_stat:bool = False)->Tuple[np.ndarray, List]:
+                           show_time_stat:bool = True)->Tuple[np.ndarray, List]:
         """
         Perform triangulation using niter2 algorithm for all 3D points.
 
@@ -299,9 +379,12 @@ class Niter2:
         left_pts_updated = right_pts_updated.astype(float)
         # Use DLT to triangulate 3D points
         t11 = curr_time()
-        out_pts3d = self.two_view_linear_triangulate(left_pts_updated,
-                                                     right_pts_updated,
-                                                     p_left, p_right) # [Kx3]
+        # out_pts3d = self.two_view_linear_triangulate(left_pts_updated,
+        #                                              right_pts_updated,
+        #                                              p_left, p_right) # [Kx3]
+        lp = left_pts_updated[:,:2]
+        rp = right_pts_updated[:,:2]
+        out_pts3d,_ = triangulate_v2(p_left, lp, p_right,rp) # [Kx3]
         t12 = curr_time()
         t_triangulate = (t12 - t11)/1000 # seconds
         if show_time_stat:
@@ -762,16 +845,18 @@ def plot3d_test(arr1, arr2):
     fig = plt.figure()
     ax = fig.add_subplot(projection='3d')
     # Plot hs_pts3d points
-    xs = hs_pts3d[:, 0]
-    ys = hs_pts3d[:, 1]
-    zs = hs_pts3d[:, 2]
+    xs = arr1[:, 0]
+    ys = arr1[:, 1]
+    zs = arr1[:, 2]
     ax.scatter(xs, ys, zs, label='hs', color='black', alpha=0.3)
     # Plot niter2_pts3d points in orange
-    xs_niter2 = niter2_pts3d[:, 0]
-    ys_niter2 = niter2_pts3d[:, 1]
-    zs_niter2 = niter2_pts3d[:, 2]
+    xs_niter2 = arr2[:, 0]
+    ys_niter2 = arr2[:, 1]
+    zs_niter2 = arr2[:, 2]
     ax.scatter(xs_niter2, ys_niter2, zs_niter2, label='niter2', color='red',
             marker='+')
+
+
 
 def perform_experiment(dataset_name: str, feature_detector:str,
                   full_verbose:bool = False,
@@ -851,6 +936,11 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         # short verbose message
         if short_verbose:
             print(f"Image pair: {pairs_processed} contains {left_pts.shape[0]} kp pts.")
+        
+        plot3d_test(hs_pts3d, niter2_pts3d)
+
+        if pairs_processed == 5:
+            break
 
         # end of loop
     results.pair_processed = pairs_processed
