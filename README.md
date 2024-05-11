@@ -2,6 +2,7 @@
 
 This is the python port of Dr. Lindstorm's ```niter2``` triangulation method from his 2010 paper[1]. 
 
+TODO needs a better writeup
 The key problem this method solves is recovering 3D scene given two or more images are obtained from a calibrated(or uncalibrated) camera.
 
 TODO complete this write up once the project is ready.
@@ -9,10 +10,7 @@ TODO complete this write up once the project is ready.
 TODO the commands to setup enviornment
 
 ### Requirements
-    * ```mamba create --name niter2 python=3.9
-    * ```micromamba activate niter2```
-    * OpenCV= 4.5.5
-        * ```mamba install -c conda-forge opencv=4.5.5=py39hf3d152e_9```
+    * OpenCV
     * Numpy
     * Matplotlib
     * Numba

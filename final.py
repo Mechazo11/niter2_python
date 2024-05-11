@@ -2,6 +2,7 @@
 Project - Python port of niter2 algorithm from "Triangulation Made Easy" paper.
 
 Created in partial submission to the requirements of
+Final Project titled "Python Port of “nister2” Two-View Triangulation Method" for
 ME7953 Applied Computational Methods, Spring 2024
 
 Author:
