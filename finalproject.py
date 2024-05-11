@@ -202,9 +202,9 @@ def triangulate_v2(p1:np.ndarray, pts1:np.ndarray, p2:np.ndarray, pts2:np.ndarra
 class Niter2:
     """
     Non-iterative niter2 triangulation algorthm.
-    
-    Based on 
-    triangulate.h by 
+
+    Based on
+    niter2 algorithm by
     Peter Lindstrom
     Triangulation Made Easy
     IEEE Computer Vision and Pattern Recognition 2010, pp. 1554-1561
@@ -213,22 +213,6 @@ class Niter2:
     Azmyin Md. Kamal
     Ph.d. student, MIE,
     Louisiana State University
-    
-    The function triangulate performs optimal two-view triangulation
-    of a pair of point correspondences in calibrated cameras. Either niter1
-    or niter2 can be used, with system defaulting to niter2 
-    
-    Given measured
-    projections u = (u1, u2, -1) and v = (v1, v2, -1) of a 3D point, u and v
-    are minimally corrected so that they (to near machine precision) satisfy
-    the epipolar constraint u' E v = 0.  The corrected points on the image
-    plane are returned as x = (x1, x2, -1) and y = (y1, y2, -1).
-
-    A right-handed coordinate system is assumed, with the image plane at
-    z = -1.  If a left-handed coordinate system is used, where the image plane
-    is at z = +1, then the argument f should be negated (alternatively, all
-    subtractions of f in the function could be changed to additions).
-
     """
 
     def __init__(self, algorithm:str = "niter2") -> None:
@@ -452,7 +436,7 @@ class Results:
 
     def generate_plots(self) -> None:
         """Plot 1x2 subplots showing two cases."""
-        plot_cand1 = self.to_plot[0]
+        plot_cand1 = self.to_plot[10] # The first few plots have 0.00 errors
         plot_cand2 = self.to_plot[-1]
         # Create 1x2 subplot layout
         _, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={'projection': '3d'},
@@ -825,10 +809,10 @@ def perform_experiment(dataset_name: str, feature_detector:str,
             print()
         pairs_processed+=1
         ty = curr_time() - tx
-        # p_mat_left = np.copy(p_mat_right) # Formulation does not need it
+        p_mat_left = np.copy(p_mat_right) # Formulation does not need it
         # short verbose message
         if short_verbose:
-            print(f"Image pair: {pairs_processed}, {left_pts.shape[0]} pts, time: {ty}")
+            print(f"Img pair: {pairs_processed}, {left_pts.shape[0]} pts, time: {ty} ms")  # noqa: E501
             #plot3d_test(hs_pts3d, niter2_pts3d)
         # DEBUG
         # if pairs_processed == 7:
