@@ -39,8 +39,7 @@ TODO the commands to setup enviornment
 
 ### TODOs
 
-- [ ] If time permits, figure out a way to access the ground-truth camera poses from ```notredame.out``` and then compare it with the Opencv.pose_estimate() based on the 3D points tracked by this method 
-
+ - [] Convert Niter2 into a standalone module, make numba accelerated functions staticmethods and pin the project.
 
 ### References
 
