@@ -39,7 +39,7 @@ def curr_time():
 def debug_lock():
     """Locks system in an infinite loop for debugging."""
     print("LOCK")
-    while (1):
+    while 1:
         pass
 
 @jit(nopython = True, parallel = False)
