@@ -316,6 +316,7 @@ class DataSetLoader:
     def __init__(self, dataset_name:str = "") -> None:
         """Class constructor."""
         # Initialize variables
+        self.dataset_name = dataset_name
         self.parent_dir = ""
         self.dataset_path = ""
         self.image_path = ""
@@ -362,17 +363,23 @@ class DataSetLoader:
 
     def show_dataset_images(self):
         """Plot 1x4 subplots showing images from the dataset."""
-        _, axs = plt.subplots(2, 2) # Setup 2x2 subplot
-        plt.rcParams["figure.figsize"] = (12,12)
-        img1 = self.image_path_lss[10]
-        img2 = self.image_path_lss[100]
-        img3 = self.image_path_lss[200]
-        img4 = self.image_path_lss[300]
-        # Populate plots
-        axs[0,0].imshow(cv2.imread(img1, 1))
-        axs[0,1].imshow(cv2.imread(img2, 1))
-        axs[1,0].imshow(cv2.imread(img3, 1))
-        axs[1,1].imshow(cv2.imread(img4, 1))
+
+        # Determine figure size based on dataset
+        if self.dataset_name == "drone":
+            figsize = (7, 7)
+        elif self.dataset_name == "robot":
+            figsize = (7, 7)
+        else:
+            figsize = (6, 6)  # Default size or handle other cases
+        # Setup 2x2 subplot with the determined size
+        fig, axs = plt.subplots(2, 2, figsize=figsize)
+        # List of image indices to show
+        image_indices = [10, 100, 200, 300]
+        for idx, ax in zip(image_indices, axs.ravel()):
+            img_path = self.image_path_lss[idx]
+            image = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
+            ax.imshow(image, cmap='gray')  # Ensure using gray color map
+            ax.axis('off')  # Optional: remove axes for cleaner look
         plt.tight_layout()
         plt.show()
 
