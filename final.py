@@ -359,7 +359,23 @@ class DataSetLoader:
         # From pathlib.PosixPath to str
         self.image_path_lss = [str(path) for path in self.image_path_lss]
         self.num_images = len(self.image_path_lss)
-    
+
+    def show_dataset_images(self):
+        """Plot 1x4 subplots showing images from the dataset."""
+        _, axs = plt.subplots(2, 2) # Setup 2x2 subplot
+        plt.rcParams["figure.figsize"] = (12,12)
+        img1 = self.image_path_lss[10]
+        img2 = self.image_path_lss[100]
+        img3 = self.image_path_lss[200]
+        img4 = self.image_path_lss[300]
+        # Populate plots
+        axs[0,0].imshow(cv2.imread(img1, 1))
+        axs[0,1].imshow(cv2.imread(img2, 1))
+        axs[1,0].imshow(cv2.imread(img3, 1))
+        axs[1,1].imshow(cv2.imread(img4, 1))
+        plt.tight_layout()
+        plt.show()
+
     def extract_camera_params(self):
         """Extract camera configuration parameters."""
         with Path(self.dataset_yaml_file).open() as file:
@@ -615,39 +631,39 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     # plt.show()
     return left_epliline_img, right_epiline_img
 
-# TODO deprecite
-def show_epilines(dataset_name: str, feature_detector:str)->None:
-    """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
-    if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
-        err_msg = "choose either 'ORB' or 'SIFT' feature."
-        raise ValueError(err_msg)
-    # Intialize variables
-    left_img = None
-    right_img = None
-    left_pts, right_pts = [],[]
-    f_mat = np.zeros((0),dtype=float)
+# # TODO deprecite
+# def show_epilines(dataset_name: str, feature_detector:str)->None:
+#     """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
+#     if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
+#         err_msg = "choose either 'ORB' or 'SIFT' feature."
+#         raise ValueError(err_msg)
+#     # Intialize variables
+#     left_img = None
+#     right_img = None
+#     left_pts, right_pts = [],[]
+#     f_mat = np.zeros((0),dtype=float)
 
-    # Define objects
-    dataloader = DataSetLoader(dataset_name)
-    lp = dataloader.image_path_lss[0]
-    rp = dataloader.image_path_lss[1]
-    # Load images and make them grayscale
-    left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
-    right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
-    left_pts, right_pts = detect_features_and_track(feature_detector,left_img, right_img)
-    # pts1, pts2 updated in place through return
-    f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
-    # DEBUG
-    generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
+#     # Define objects
+#     dataloader = DataSetLoader(dataset_name)
+#     lp = dataloader.image_path_lss[0]
+#     rp = dataloader.image_path_lss[1]
+#     # Load images and make them grayscale
+#     left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
+#     right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
+#     left_pts, right_pts = detect_features_and_track(feature_detector,left_img, right_img)
+#     # pts1, pts2 updated in place through return
+#     f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
+#     # DEBUG
+#     generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
 
-    # # DEBUG print stats
-    # if show_verbose:
-    #     print()
-    #     print(f"Number of images in dataset: {dataloader.num_images}")
-    #     print(f"Feature detector selected: {feature_detector}")
-    #     print(f"Pts matched: {len(left_pts)}")
-    #     print(f"Fundamental matrix computed: {f_mat}")
-    #     print()
+#     # # DEBUG print stats
+#     # if show_verbose:
+#     #     print()
+#     #     print(f"Number of images in dataset: {dataloader.num_images}")
+#     #     print(f"Feature detector selected: {feature_detector}")
+#     #     print(f"Pts matched: {len(left_pts)}")
+#     #     print(f"Fundamental matrix computed: {f_mat}")
+#     #     print()
 
 def demo_epilines(dataset_name: str)->None:
     """
