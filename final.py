@@ -462,7 +462,7 @@ class Results:
 
     def generate_plots(self) -> None:
         """Plot 1x2 subplots showing two cases."""
-        plot_cand1 = self.to_plot[10] # The first few plots have 0.00 errors
+        plot_cand1 = self.to_plot[25] # The first few plots have 0.00 errors
         plot_cand2 = self.to_plot[-1]
         # Create 1x2 subplot layout
         _, (ax1, ax2) = plt.subplots(1, 2, subplot_kw={'projection': '3d'},
@@ -511,10 +511,12 @@ class Results:
                                                  self.hs_time)
         niter_pts_sec = self.compute_points_per_sec(self.triangulated_pts_niter2,
                                                     self.niter2_time)
+        rmse_arr = np.array(self.rmse_scores)
+        rmse_mean = np.mean(rmse_arr)
         print()
         print(f"HS method: {int(hs_pts_sec/ 1000)}K points/sec")
         print(f"Niter2 method: {int(niter_pts_sec/1000)}K points/sec")
-        print(f"Average relative RMSE error: {np.mean(np.array(self.rmse_scores))}")
+        print(f"Average relative RMSE error: {rmse_mean}")
         print()
 
 def lowe_ratio_test(matches:tuple, kp1:tuple, kp2:tuple)->Tuple[List, List]:
@@ -638,40 +640,6 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
     # plt.tight_layout()
     # plt.show()
     return left_epliline_img, right_epiline_img
-
-# # TODO deprecite
-# def show_epilines(dataset_name: str, feature_detector:str)->None:
-#     """Demonstrate correct setup of SIFT and ORB detectors using epiline images."""
-#     if feature_detector.strip().upper() not in ["ORB", "SIFT"]:
-#         err_msg = "choose either 'ORB' or 'SIFT' feature."
-#         raise ValueError(err_msg)
-#     # Intialize variables
-#     left_img = None
-#     right_img = None
-#     left_pts, right_pts = [],[]
-#     f_mat = np.zeros((0),dtype=float)
-
-#     # Define objects
-#     dataloader = DataSetLoader(dataset_name)
-#     lp = dataloader.image_path_lss[0]
-#     rp = dataloader.image_path_lss[1]
-#     # Load images and make them grayscale
-#     left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
-#     right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
-#     left_pts, right_pts = detect_features_and_track(feature_detector,left_img, right_img)
-#     # pts1, pts2 updated in place through return
-#     f_mat, left_pts, right_pts = compute_fundamental_matrix(left_pts,right_pts)
-#     # DEBUG
-#     generate_epipline_imgs(left_img, right_img,f_mat,left_pts, right_pts)
-
-#     # # DEBUG print stats
-#     # if show_verbose:
-#     #     print()
-#     #     print(f"Number of images in dataset: {dataloader.num_images}")
-#     #     print(f"Feature detector selected: {feature_detector}")
-#     #     print(f"Pts matched: {len(left_pts)}")
-#     #     print(f"Fundamental matrix computed: {f_mat}")
-#     #     print()
 
 def demo_epilines(dataset_name: str)->None:
     """
