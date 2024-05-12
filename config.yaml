@@ -1,0 +1,8 @@
+#--------------------------------------------------------------------------------------------
+# Key configuration parameters to use niter2
+#--------------------------------------------------------------------------------------------
+
+# Parent directory for all testing datasets
+Directory:
+  parent_dir: "Dataset/"
+
