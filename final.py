@@ -29,6 +29,7 @@ from pathlib import Path
 import natsort
 import cv2
 np.set_printoptions(suppress=True)
+np.seterr(all='ignore') #! BAD IDEA TODO WILL BE REMOVED
 
 # Utility functions
 def curr_time():
