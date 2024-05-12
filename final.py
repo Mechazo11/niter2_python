@@ -310,7 +310,7 @@ class Niter2:
 class DataSetLoader:
     """
     Compile image paths and camera intrinsic parameters for chosen dataset.
-    
+
     Constructor only, all processing done in this method.
     """
 
@@ -364,7 +364,6 @@ class DataSetLoader:
 
     def show_dataset_images(self):
         """Plot 1x4 subplots showing images from the dataset."""
-
         # Determine figure size based on dataset
         if self.dataset_name == "drone":
             figsize = (7, 7)
@@ -395,7 +394,7 @@ class DataSetLoader:
         self.calibration_matrix[2,2] = 1.0
         #DEBUG
         #print(f"calibration matrix: {self.calibration_matrix}")
-    
+
     def test_pairwise_images(self):
         """Test if images are loaded in correct sequence."""
         for i in range(self.num_images - 1):
@@ -555,7 +554,7 @@ def detect_features_and_track(feature_detector:str, img1:np.ndarray,
         kp2, des2 = sift.detectAndCompute(img2,None)
         # print(type(kp1)) # class tuple
         # print(type(des1))# class numpy.ndarray
-        
+
     else:
         # Setup FLANN for ORB, as suggested
         # https://docs.opencv.org/4.x/dc/dc3/tutorial_py_matcher.html
@@ -574,7 +573,7 @@ def detect_features_and_track(feature_detector:str, img1:np.ndarray,
         orb = cv2.ORB_create(nfeatures=500)
         kp1, des1 = orb.detectAndCompute(img1,None)
         kp2, des2 = orb.detectAndCompute(img2,None)
-        
+
     # Perform Lowe's ratio test and return best matching points
     if (feature_detector == "SIFT"):
         matches = flann.knnMatch(des1,des2,k=2) # Find an initial matches of keypoints
@@ -584,7 +583,7 @@ def detect_features_and_track(feature_detector:str, img1:np.ndarray,
         # Brute force matcher and hamming distance to find matching points
         bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
         matches = bf.match(des1,des2)
-        matches = sorted(matches, key = lambda x:x.distance) # Sort them in the order of their distance.
+        matches = sorted(matches, key = lambda x:x.distance)
         pts1 = np.int32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
         pts2 = np.int32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 2)
         #pts1 = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 2)
@@ -621,7 +620,7 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
                    right_pts:List)->Tuple[np.ndarray, np.ndarray]:
     """
     Draw epilines between the two images.
-    
+
     Serves as a visual test to check if Fundamental matrix is correct or not
     f_mat: 3x3 fundamental matrix
     """
@@ -644,7 +643,7 @@ def generate_epipline_imgs(left_img:np.ndarray, right_img:np.ndarray,
 def demo_epilines(dataset_name: str)->None:
     """
     Demonstrate correct setup of feature detectors using epiline images.
-    
+
     2x2 image is generated for the two features selected
     """
     # Intialize variables
@@ -660,11 +659,11 @@ def demo_epilines(dataset_name: str)->None:
     dataloader = DataSetLoader(dataset_name)
     lp = dataloader.image_path_lss[0]
     rp = dataloader.image_path_lss[1]
-    
+
     # Load images and make them grayscale
     left_img = cv2.imread(lp,cv2.IMREAD_GRAYSCALE)
     right_img = cv2.imread(rp,cv2.IMREAD_GRAYSCALE)
-    
+
     # SIFT
     left_pts, right_pts = detect_features_and_track("SIFT",left_img, right_img)
     f_mat_sift, left_pts_sift, right_pts_sift = compute_fundamental_matrix(left_pts,
@@ -702,7 +701,7 @@ def generate_projection_matrix(k_mat:np.ndarray, rot:np.ndarray,
                                tvec:np.ndarray)->np.ndarray:
     """
     Compute 3x4 Projectio Matrix P.
-    
+
     k_mat: 3x3 calibration matrix K
     rot: 3x3 rotation matrix R
     tvec: 3x1 translation vector t
@@ -810,8 +809,8 @@ def perform_experiment(dataset_name: str, feature_detector:str,
         rot1 = np.zeros((3,3), dtype=float)
         #rot2 = np.zeros((3,3), dtype=float)
         tvec = np.zeros(3, dtype=float)
-        hs_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d poits in homogeneous coord
-        niter2_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in homogeneous coord
+        hs_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d poits in hom coord
+        niter2_pts3d = np.zeros((0,3), dtype=float) # [Kx4] 3d points in hom coord
 
         # Paths to left and right image
         lp = dataloader.image_path_lss[i]
