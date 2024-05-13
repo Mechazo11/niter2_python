@@ -1,6 +1,6 @@
 ## Experiment Steps
 
-Study we will conduct
+Markdown file containing my notes for the final project I did as part of ME 7953
 
 1. Effect of features detected [using NotreDame dataset]
 
