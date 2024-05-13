@@ -1,5 +1,5 @@
 [tool.flake8]
-max-line-length = 88
+max-line-length = 120
 show-source = true
 
 [tool.pylint.'MAIN']
@@ -12,7 +12,7 @@ inherit = false
 ignore = "D105,D107,D203,D212,D413,D407"
 
 [tool.ruff]
-line-length = 88
+line-length = 120
 target-version = "py38"
 fixable = []
 unfixable = ["ALL"]
