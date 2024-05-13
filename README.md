@@ -1,7 +1,7 @@
 ## Niter2 Python
 
 ### Preamble
-This is the python port of Dr. Lindstorm's ```niter2``` image-space triangulation method from his 2010 paper[1]. This was done as part of the Final Project for ME 7953 Applied Computational Methods taught by Dr. Ingmar Schoegl at Louisiana State University.
+This is the python port of Dr. Lindstorm's ```niter2``` image-space triangulation method from his [2010 paper](https://ieeexplore.ieee.org/document/5539785). This was done as part of the Final Project for ME 7953 Applied Computational Methods taught by Dr. Ingmar Schoegl at Louisiana State University.
 
 ### Implementation notes
 ```niter2``` primarily optimizes matched keypoints by moving them on the epipolar line in such a way that intermediate steps obeys epipolar constraint. Lindstorm later demonstrated that with only two steps, reprojection error may reach as low as machine precision. Thus, ```niter2``` is a two interation process. Please refer to the original paper (given in the repository) for further details.
